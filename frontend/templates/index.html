@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PhishGuard – Analyse Email</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/main.css"/>
+</head>
+<body>
+
+<!-- ══ MOBILE TOPBAR ══ -->
+<div class="topbar" id="topbar">
+  <div class="topbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>PhishGuard</span>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-lang">
+      <button class="topbar-lang-btn active" data-lang="en">EN</button>
+      <button class="topbar-lang-btn" data-lang="sw">SW</button>
+    </div>
+    <button class="topbar-theme" id="topbarTheme"><i class="ti ti-moon" id="topbarThemeIcon"></i></button>
+    <button class="hamburger" id="hamburger" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="app-shell">
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div><span class="brand-name">PhishGuard</span>&nbsp;<span class="brand-tag">v1.0</span></div>
+  </div>
+
+  <div class="sidebar-section-label">Navigation</div>
+  <ul class="sidebar-nav">
+    <li><a href="/" class="sidebar-link active"><i class="ti ti-shield-search"></i><span data-i18n="nav_analyse">Analyse</span></a></li>
+    <li><a href="/dashboard" class="sidebar-link"><i class="ti ti-chart-bar"></i><span data-i18n="nav_dashboard">Dashboard</span></a></li>
+    <li><a href="/training" class="sidebar-link"><i class="ti ti-school"></i><span data-i18n="nav_training">Training</span></a></li>
+    <li><a href="/rules" class="sidebar-link"><i class="ti ti-adjustments"></i><span data-i18n="nav_rules">Rules</span></a></li>
+  </ul>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-footer">
+    <div class="sidebar-lang">
+      <button class="sidebar-lang-btn active" data-lang="en">EN</button>
+      <button class="sidebar-lang-btn" data-lang="sw">SW</button>
+    </div>
+    <button class="sidebar-theme-btn" id="themeToggle">
+      <i class="ti ti-moon" id="themeIcon"></i><span id="themeLabel">Dark Mode</span>
+    </button>
+    <div class="sidebar-copy">PhishGuard &copy; 2024 &middot; Tanzania</div>
+  </div>
+</aside>
+
+<!-- ══ PAGE CONTENT ══ -->
+<div class="page-content">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title" data-i18n="hero_title">Detect Phishing Emails Instantly</h1>
+      <p class="hero-subtitle" data-i18n="hero_subtitle">Paste any email below — our rule engine analyses 30+ threat indicators in under 2 seconds.</p>
+      <div class="hero-stats">
+        <span class="stat-badge"><i class="ti ti-shield"></i><span id="statTotal">0</span>&nbsp;<span data-i18n="stat_analysed">analysed</span></span>
+        <span class="stat-badge stat-danger"><i class="ti ti-bug"></i><span id="statPhishing">0</span>&nbsp;phishing</span>
+        <span class="stat-badge stat-warn"><i class="ti ti-alert-triangle"></i><span id="statSuspicious">0</span>&nbsp;suspicious</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container" id="mainContent">
+
+    <!-- INPUT CARD -->
+    <section class="card" aria-labelledby="inputTitle">
+      <div class="card-header">
+        <h2 id="inputTitle" class="card-title"><i class="ti ti-mail" style="color:var(--color-brand);"></i><span data-i18n="input_title">Email Input</span></h2>
+        <div class="tab-group" role="tablist">
+          <button class="tab active" role="tab" data-tab="fields" id="tab-fields"><i class="ti ti-forms"></i><span data-i18n="tab_fields">Form Fields</span></button>
+          <button class="tab" role="tab" data-tab="raw" id="tab-raw"><i class="ti ti-code"></i><span data-i18n="tab_raw">Raw Email</span></button>
+        </div>
+      </div>
+
+      <!-- FIELDS MODE -->
+      <div class="tab-content active" id="panel-fields" role="tabpanel">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="inputSender" class="form-label" data-i18n="lbl_sender">From (Sender)</label>
+            <input type="text" id="inputSender" class="form-input" placeholder="e.g. CRDB Security &lt;security@crdb-verify.xyz&gt;" autocomplete="off" spellcheck="false"/>
+          </div>
+          <div class="form-group">
+            <label for="inputRecipient" class="form-label" data-i18n="lbl_recipient">To (Recipient)</label>
+            <input type="text" id="inputRecipient" class="form-input" placeholder="e.g. employee@company.com" autocomplete="off"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputSubject" class="form-label" data-i18n="lbl_subject">Subject</label>
+          <input type="text" id="inputSubject" class="form-input" placeholder="e.g. URGENT: Your account has been suspended"/>
+        </div>
+        <div class="form-group">
+          <label for="inputBody" class="form-label" data-i18n="lbl_body">Email Body (Plain Text)</label>
+          <textarea id="inputBody" class="form-textarea" rows="8"
+            placeholder="Paste the email body here…&#10;&#10;Example:&#10;Dear Customer, your CRDB account is suspended.&#10;Verify now: http://crdb-secure.tk/login&#10;Enter your PIN immediately."></textarea>
+        </div>
+        <details class="optional-section">
+          <summary class="optional-toggle"><i class="ti ti-code" style="font-size:13px;margin-right:5px;"></i>HTML Body (optional)</summary>
+          <div class="form-group" style="margin-top:10px"><textarea id="inputHtml" class="form-textarea" rows="4" placeholder="Paste raw HTML of the email body…"></textarea></div>
+        </details>
+        <details class="optional-section">
+          <summary class="optional-toggle"><i class="ti ti-list-details" style="font-size:13px;margin-right:5px;"></i>Email Headers (optional)</summary>
+          <div class="form-group" style="margin-top:10px"><textarea id="inputHeaders" class="form-textarea" rows="4" placeholder="Received-SPF: fail&#10;DKIM-Signature: …"></textarea></div>
+        </details>
+      </div>
+
+      <!-- RAW MODE -->
+      <div class="tab-content" id="panel-raw" role="tabpanel" hidden>
+        <div class="form-group">
+          <label for="inputRaw" class="form-label" data-i18n="lbl_raw">Full RFC-2822 Email</label>
+          <textarea id="inputRaw" class="form-textarea mono" rows="16"
+            placeholder="Paste the complete email source here (headers + body)…&#10;&#10;From: sender@example.com&#10;To: victim@company.com&#10;Subject: Test&#10;&#10;Email body here…"></textarea>
+        </div>
+      </div>
+
+      <div class="form-row-inline">
+        <label class="form-label" data-i18n="lbl_report_lang">Report Language:</label>
+        <select id="reportLang" class="form-select-sm">
+          <option value="en">English</option>
+          <option value="sw">Kiswahili</option>
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary btn-lg" id="analyseBtn">
+          <i class="ti ti-shield-search"></i>
+          <span class="btn-label" data-i18n="btn_analyse">Analyse Email</span>
+          <span class="btn-spinner" hidden><svg class="spinner-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4" stroke-dashoffset="10"/></svg></span>
+        </button>
+        <button class="btn btn-secondary" id="clearBtn"><i class="ti ti-trash"></i><span>Clear</span></button>
+      </div>
+
+      <div class="progress-bar-wrap" id="progressWrap" hidden style="margin-top:20px;">
+        <div class="progress-bar" id="progressBar"></div>
+        <span class="progress-label" id="progressLabel">Parsing email…</span>
+      </div>
+    </section>
+
+    <!-- TIPS CARD -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="ti ti-bulb" style="color:var(--color-warn);"></i>Phishing Red Flags to Watch</h3>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--text-secondary);">
+          <i class="ti ti-world" style="color:var(--color-danger);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+          <span>Suspicious TLDs: <strong style="color:var(--text-primary);">.xyz .tk .ml .ga .cf</strong> — never used by real banks</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--text-secondary);">
+          <i class="ti ti-alert-triangle" style="color:var(--color-warn);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+          <span>Urgency phrases: <strong style="color:var(--text-primary);">"URGENT", "24 hours", "account suspended"</strong></span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--text-secondary);">
+          <i class="ti ti-lock" style="color:var(--color-brand);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+          <span>Credential requests: <strong style="color:var(--text-primary);">banks never ask for PIN via email</strong></span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--text-secondary);">
+          <i class="ti ti-user-x" style="color:var(--color-purple);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+          <span>Generic greeting: <strong style="color:var(--text-primary);">"Dear Customer"</strong> instead of your name</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS SECTION -->
+    <section id="resultsSection" hidden aria-live="polite">
+      <div class="result-banner" id="resultBanner" role="alert">
+        <div class="banner-left">
+          <div class="verdict-icon" id="verdictIcon"></div>
+          <div class="verdict-text">
+            <h2 class="verdict-label" id="verdictLabel">—</h2>
+            <p class="verdict-sub" id="verdictSub">Risk Score</p>
+          </div>
+        </div>
+        <div class="banner-right">
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 200 120">
+              <path d="M20,100 A80,80 0 0,1 180,100" fill="none" stroke="var(--gauge-track)" stroke-width="14" stroke-linecap="round"/>
+              <path class="gauge-arc" id="gaugeArc" d="M20,100 A80,80 0 0,1 180,100" fill="none" stroke="#EF4444" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+              <text x="100" y="90" text-anchor="middle" class="gauge-score" id="gaugeScore">0</text>
+              <text x="100" y="110" text-anchor="middle" class="gauge-label">/ 100</text>
+            </svg>
+          </div>
+          <div class="meta-chips">
+            <span class="chip"><i class="ti ti-chart-pie"></i><span id="confidenceVal">—</span></span>
+            <span class="chip"><i class="ti ti-list-check"></i><span id="rulesVal">—</span>&nbsp;rules</span>
+            <span class="chip"><i class="ti ti-clock"></i><span id="timeVal">—</span>ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card narrative-card" id="narrativeCard" style="margin-top:14px;">
+        <p class="narrative-text" id="narrativeText"></p>
+        <p class="recommendation-text" id="recommendationText" style="margin-top:10px;"></p>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="tab-group" role="tablist" style="margin-bottom:14px;">
+          <button class="tab active" data-rtab="rules" id="rtab-rules"><i class="ti ti-shield-x"></i><span>Triggered Rules</span><span class="tab-count" id="tabRuleCount">0</span></button>
+          <button class="tab" data-rtab="categories" id="rtab-categories"><i class="ti ti-chart-donut"></i><span>Categories</span></button>
+          <button class="tab" data-rtab="info" id="rtab-info"><i class="ti ti-info-circle"></i><span>Email Info</span></button>
+        </div>
+        <div class="result-tab-content active" id="rpanel-rules"><div id="rulesContainer" class="rules-container"></div></div>
+        <div class="result-tab-content" id="rpanel-categories" hidden>
+          <div class="category-chart-wrap"><canvas id="categoryChart" height="220"></canvas></div>
+          <div id="categoryList" class="category-list"></div>
+        </div>
+        <div class="result-tab-content" id="rpanel-info" hidden>
+          <table class="info-table" id="emailInfoTable"><tbody></tbody></table>
+        </div>
+      </div>
+
+      <div class="result-actions" style="margin-top:10px;">
+        <button class="btn btn-outline" id="exportPdfBtn"><i class="ti ti-file-type-pdf"></i>Export PDF</button>
+        <button class="btn btn-outline" id="feedbackCorrectBtn" data-correct="true"><i class="ti ti-thumb-up"></i>Correct</button>
+        <button class="btn btn-outline" id="feedbackWrongBtn" data-correct="false"><i class="ti ti-thumb-down"></i>Incorrect</button>
+        <button class="btn btn-secondary" id="newAnalysisBtn"><i class="ti ti-refresh"></i>New Analysis</button>
+      </div>
+    </section>
+
+    <!-- RECENT HISTORY -->
+    <section class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="ti ti-history" style="color:var(--color-brand);"></i><span data-i18n="recent_history">Recent Analyses</span></h3>
+        <a href="/dashboard" class="btn btn-sm btn-outline"><span data-i18n="view_all">View all</span>&nbsp;<i class="ti ti-arrow-right"></i></a>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="history-table">
+          <thead><tr><th>Sender</th><th>Subject</th><th>Score</th><th>Result</th><th>When</th></tr></thead>
+          <tbody id="historyBody">
+            <tr><td colspan="5" class="table-empty">No analyses yet — submit an email above.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">PhishGuard &copy; 2024 &mdash; Open-source phishing detection &mdash; Tanzania</footer>
+</div>
+</div>
+
+<div class="toast" id="toast" role="alert" aria-live="assertive" hidden>
+  <i class="toast-icon ti" id="toastIcon"></i><span id="toastMsg"></span>
+</div>
+
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/theme.js"></script>
+<script src="/static/js/sidebar.js"></script>
+<script src="/static/js/analyse.js"></script>
+<script src="/static/js/history.js"></script>
+</body>
+</html>

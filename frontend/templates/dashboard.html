@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PhishGuard – Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/main.css"/>
+</head>
+<body>
+
+<div class="topbar" id="topbar">
+  <div class="topbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>PhishGuard</span>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-lang">
+      <button class="topbar-lang-btn active" data-lang="en">EN</button>
+      <button class="topbar-lang-btn" data-lang="sw">SW</button>
+    </div>
+    <button class="topbar-theme" id="topbarTheme"><i class="ti ti-moon" id="topbarThemeIcon"></i></button>
+    <button class="hamburger" id="hamburger"><i class="ti ti-menu-2"></i></button>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="app-shell">
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div><span class="brand-name">PhishGuard</span>&nbsp;<span class="brand-tag">v1.0</span></div>
+  </div>
+  <div class="sidebar-section-label">Navigation</div>
+  <ul class="sidebar-nav">
+    <li><a href="/" class="sidebar-link"><i class="ti ti-shield-search"></i><span>Analyse</span></a></li>
+    <li><a href="/dashboard" class="sidebar-link active"><i class="ti ti-chart-bar"></i><span>Dashboard</span></a></li>
+    <li><a href="/training" class="sidebar-link"><i class="ti ti-school"></i><span>Training</span></a></li>
+    <li><a href="/rules" class="sidebar-link"><i class="ti ti-adjustments"></i><span>Rules</span></a></li>
+  </ul>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-footer">
+    <!-- <div class="sidebar-lang">
+      <button class="sidebar-lang-btn active" data-lang="en">EN</button>
+      <button class="sidebar-lang-btn" data-lang="sw">SW</button>
+    </div> -->
+    <button class="sidebar-theme-btn" id="themeToggle">
+      <i class="ti ti-moon" id="themeIcon"></i><span id="themeLabel">Dark Mode</span>
+    </button>
+    <div class="sidebar-copy">PhishGuard &copy; 2024 &middot; Tanzania</div>
+  </div>
+</aside>
+
+<div class="page-content">
+  <main class="main-container" style="padding-top:28px;">
+
+    <div class="page-header">
+      <h1 class="page-title"><i class="ti ti-chart-bar" style="color:var(--color-brand);"></i>Analytics Dashboard</h1>
+      <p class="page-sub">Overview of all phishing detection activity</p>
+      <button class="btn btn-outline btn-sm" id="refreshBtn"><i class="ti ti-refresh"></i>Refresh</button>
+    </div>
+
+    <!-- STATS CARDS -->
+    <div class="stats-grid">
+      <div class="stat-card stat-card-total"><div class="stat-icon"><i class="ti ti-mail-opened"></i></div><div><div class="stat-num" id="dashTotal">—</div><div class="stat-lbl">Total Analysed</div></div></div>
+      <div class="stat-card stat-card-phish"><div class="stat-icon"><i class="ti ti-bug"></i></div><div><div class="stat-num" id="dashPhishing">—</div><div class="stat-lbl">Phishing</div></div></div>
+      <div class="stat-card stat-card-sus"><div class="stat-icon"><i class="ti ti-alert-triangle"></i></div><div><div class="stat-num" id="dashSuspicious">—</div><div class="stat-lbl">Suspicious</div></div></div>
+      <div class="stat-card stat-card-safe"><div class="stat-icon"><i class="ti ti-circle-check"></i></div><div><div class="stat-num" id="dashLegitimate">—</div><div class="stat-lbl">Legitimate</div></div></div>
+      <div class="stat-card stat-card-score"><div class="stat-icon"><i class="ti ti-gauge"></i></div><div><div class="stat-num" id="dashAvgScore">—</div><div class="stat-lbl">Avg. Risk Score</div></div></div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="ti ti-trending-up" style="color:var(--color-brand);"></i>14-Day Trend</h3></div>
+        <canvas id="trendChart" height="200"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="ti ti-chart-donut" style="color:var(--color-purple);"></i>Classification Split</h3></div>
+        <canvas id="breakdownChart" height="220"></canvas>
+        <div id="breakdownLegend" class="chart-legend"></div>
+      </div>
+    </div>
+
+    <!-- HEATMAP -->
+    <div class="card">
+      <div class="card-header"><h3 class="card-title"><i class="ti ti-table" style="color:var(--color-danger);"></i>Top Triggered Rules</h3></div>
+      <div id="ruleHeatmap" class="rule-heatmap"></div>
+    </div>
+
+    <!-- HISTORY TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="ti ti-history" style="color:var(--color-brand);"></i>Analysis History</h3>
+        <div class="filter-group">
+          <select id="filterClass" class="form-select-sm">
+            <option value="all">All</option>
+            <option value="phishing">Phishing</option>
+            <option value="suspicious">Suspicious</option>
+            <option value="legitimate">Legitimate</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="history-table">
+          <thead><tr><th>#</th><th>Sender</th><th>Subject</th><th>Score</th><th>Classification</th><th>Confidence</th><th>Date</th><th>Export</th></tr></thead>
+          <tbody id="fullHistoryBody"><tr><td colspan="8" class="table-empty"><i class="ti ti-loader ti-spin"></i> Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination">
+        <button class="btn btn-sm btn-outline" id="prevPage" disabled><i class="ti ti-arrow-left"></i> Prev</button>
+        <span class="page-info" id="pageInfo">Page 1</span>
+        <button class="btn btn-sm btn-outline" id="nextPage">Next <i class="ti ti-arrow-right"></i></button>
+      </div>
+    </div>
+
+  </main>
+  <footer class="site-footer">PhishGuard &copy; 2026 &mdash; Phishing Email Detection System &mdash;</footer>
+</div>
+</div>
+
+<div class="toast" id="toast" role="alert" aria-live="assertive" hidden>
+  <i class="toast-icon ti" id="toastIcon"></i><span id="toastMsg"></span>
+</div>
+
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/theme.js"></script>
+<script src="/static/js/sidebar.js"></script>
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

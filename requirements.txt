@@ -1,0 +1,34 @@
+# ============================================================
+# requirements.txt – PhishGuard Python Dependencies
+# Install with:  pip install -r requirements.txt --break-system-packages
+# Tested on Python 3.12+ (Ubuntu 24 / Windows 11 / macOS Sonoma)
+# ============================================================
+
+# ── Web Framework ────────────────────────────────────────────
+Flask==3.0.3                  # Core WSGI web framework
+Flask-SQLAlchemy==3.1.1       # SQLAlchemy ORM integration for Flask
+Flask-Limiter==3.7.0          # Rate limiting middleware
+flask-cors==4.0.1             # Cross-Origin Resource Sharing support
+
+# ── Database ─────────────────────────────────────────────────
+PyMySQL==1.1.1                # Pure-Python MySQL client (no C dependency)
+cryptography==42.0.8          # Required by PyMySQL for SSL connections
+
+# ── Email Parsing ────────────────────────────────────────────
+beautifulsoup4==4.12.3        # HTML parsing for email body analysis
+lxml==5.2.2                   # Fast XML/HTML parser (BS4 backend)
+
+# ── PDF Export ───────────────────────────────────────────────
+weasyprint==62.3              # HTML → PDF renderer using Cairo/Pango
+
+# ── Security & Input Handling ────────────────────────────────
+bleach==6.1.0                 # HTML sanitisation (defence in depth)
+Werkzeug==3.0.3               # WSGI utilities (included with Flask)
+
+# ── Utilities ────────────────────────────────────────────────
+python-dotenv==1.0.1          # Load .env files for config management
+gunicorn==22.0.0              # Production WSGI server (Linux/macOS)
+
+# ── Development / Testing ────────────────────────────────────
+pytest==8.2.2                 # Test runner
+pytest-flask==1.3.0           # Flask-specific pytest fixtures

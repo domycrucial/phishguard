@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PhishGuard – Training Mode</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="/static/css/main.css"/>
+</head>
+<body>
+
+<div class="topbar" id="topbar">
+  <div class="topbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>PhishGuard</span>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-lang">
+      <button class="topbar-lang-btn active" data-lang="en">EN</button>
+      <button class="topbar-lang-btn" data-lang="sw">SW</button>
+    </div>
+    <button class="topbar-theme" id="topbarTheme"><i class="ti ti-moon" id="topbarThemeIcon"></i></button>
+    <button class="hamburger" id="hamburger"><i class="ti ti-menu-2"></i></button>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="app-shell">
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div><span class="brand-name">PhishGuard</span>&nbsp;<span class="brand-tag">v1.0</span></div>
+  </div>
+  <div class="sidebar-section-label">Navigation</div>
+  <ul class="sidebar-nav">
+    <li><a href="/" class="sidebar-link"><i class="ti ti-shield-search"></i><span>Analyse</span></a></li>
+    <li><a href="/dashboard" class="sidebar-link"><i class="ti ti-chart-bar"></i><span>Dashboard</span></a></li>
+    <li><a href="/training" class="sidebar-link active"><i class="ti ti-school"></i><span>Training</span></a></li>
+    <li><a href="/rules" class="sidebar-link"><i class="ti ti-adjustments"></i><span>Rules</span></a></li>
+  </ul>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-footer">
+    <!-- <div class="sidebar-lang">
+      <button class="sidebar-lang-btn active" data-lang="en">EN</button>
+      <button class="sidebar-lang-btn" data-lang="sw">SW</button>
+    </div> -->
+    <button class="sidebar-theme-btn" id="themeToggle">
+      <i class="ti ti-moon" id="themeIcon"></i><span id="themeLabel">Dark Mode</span>
+    </button>
+    <div class="sidebar-copy">PhishGuard &copy; 2026 &middot;</div>
+  </div>
+</aside>
+
+<div class="page-content">
+  <main class="main-container" style="padding-top:28px;">
+
+    <div class="page-header">
+      <h1 class="page-title"><i class="ti ti-school" style="color:var(--color-brand);"></i>Training Mode</h1>
+      <p class="page-sub">Practice identifying phishing emails using real Tanzanian examples — CRDB, NMB, TRA, UDSM and more.</p>
+    </div>
+
+    <!-- SCORE BAR -->
+    <div class="training-score-bar">
+      <div class="score-chip score-correct"><i class="ti ti-thumb-up"></i>&nbsp;<span id="scoreCorrect">0</span>&nbsp;Correct</div>
+      <div class="score-chip score-wrong"><i class="ti ti-thumb-down"></i>&nbsp;<span id="scoreWrong">0</span>&nbsp;Incorrect</div>
+      <div class="score-chip"><i class="ti ti-gauge"></i>&nbsp;Accuracy:&nbsp;<strong id="scoreAccuracy">—</strong></div>
+      <button class="btn btn-sm btn-outline" id="resetScoreBtn" style="margin-left:auto;"><i class="ti ti-refresh"></i>Reset</button>
+    </div>
+
+    <!-- FILTER PILLS -->
+    <div class="filter-bar" style="margin-top:4px;">
+      <button class="filter-pill active" data-filter="all"><i class="ti ti-layout-grid" style="font-size:13px;"></i>&nbsp;All Samples</button>
+      <button class="filter-pill" data-filter="phishing"><span class="badge badge-danger">Phishing</span></button>
+      <button class="filter-pill" data-filter="suspicious"><span class="badge badge-warn">Suspicious</span></button>
+      <button class="filter-pill" data-filter="legitimate"><span class="badge badge-safe">Legitimate</span></button>
+    </div>
+
+    <!-- CARDS GRID -->
+    <div class="training-grid" id="trainingGrid">
+      <div class="training-loading"><i class="ti ti-loader ti-spin"></i>&nbsp;Loading samples…</div>
+    </div>
+
+  </main>
+  <footer class="site-footer">PhishGuard &copy; 2026 &mdash; Phishing Email Detection System &mdash;</footer>
+</div>
+</div>
+
+<!-- CHALLENGE MODAL -->
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modalTitle" class="modal-title"><i class="ti ti-mail-opened" style="color:var(--color-brand);"></i>Email Challenge</h2>
+      <button class="modal-close" id="modalClose"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <p class="modal-question">Is this email phishing, suspicious, or legitimate?</p>
+      <div class="modal-choices">
+        <button class="choice-btn choice-phish" data-choice="phishing"><i class="ti ti-bug"></i>Phishing</button>
+        <button class="choice-btn choice-sus" data-choice="suspicious"><i class="ti ti-alert-triangle"></i>Suspicious</button>
+        <button class="choice-btn choice-safe" data-choice="legitimate"><i class="ti ti-shield-check"></i>Legitimate</button>
+      </div>
+      <button class="btn btn-primary btn-lg" id="submitChoiceBtn" disabled><i class="ti ti-check"></i>Submit Answer</button>
+      <div class="hint-section" id="hintSection" hidden>
+        <div class="hint-result" id="hintResult"></div>
+        <div class="hint-box">
+          <h4><i class="ti ti-bulb"></i>Explanation</h4>
+          <p id="hintText"></p>
+          <ul id="hintIndicators" class="indicator-list"></ul>
+        </div>
+        <button class="btn btn-primary" id="analyseThisBtn"><i class="ti ti-shield-search"></i>Run Full Analysis</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="alert" aria-live="assertive" hidden>
+  <i class="toast-icon ti" id="toastIcon"></i><span id="toastMsg"></span>
+</div>
+
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/theme.js"></script>
+<script src="/static/js/sidebar.js"></script>
+<script src="/static/js/training.js"></script>
+</body>
+</html>

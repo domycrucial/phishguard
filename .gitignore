@@ -1,0 +1,38 @@
+# PhishGuard .gitignore
+
+# Environment / Secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Exports & Logs
+exports/
+logs/
+*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Database dumps
+*.sql.bak
+*.dump
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
