@@ -38,7 +38,7 @@ def create_app(config_class=Config) -> Flask:
     app.config.from_object(config_class)
 
     # ── Security: CORS restricted to same origin in production ──────────
-    CORS(app, resources={r"/api/*": {"origins": app.config.get("CORS_ORIGINS", "*")}})
+    CORS(app, resources={r"/api/v1/*": {"origins": app.config.get("CORS_ORIGINS", "*")}})
 
     # ── Rate limiting: prevent brute-force and DoS ───────────────────────
     Limiter(
@@ -48,8 +48,8 @@ def create_app(config_class=Config) -> Flask:
         storage_uri="memory://"
     )
 
-    # ── Register all API routes under /api ───────────────────────────────
-    app.register_blueprint(api_blueprint, url_prefix="/api")
+    # ── Register all API routes under /api/v1 ────────────────────────────
+    app.register_blueprint(api_blueprint, url_prefix="/api/v1")
 
     # ── Database initialisation ──────────────────────────────────────────
     with app.app_context():
@@ -90,13 +90,14 @@ def create_app(config_class=Config) -> Flask:
         return jsonify({"status": "ok", "version": "2.0.0"})
 
     app.logger.info("PhishGuard v2 initialised successfully.")
+    app.logger.info("https://localhost:5000/")
     return app
 
 
 if __name__ == "__main__":
     application = create_app()
     application.run(
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=5000,
         debug=True,
         use_reloader=True

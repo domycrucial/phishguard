@@ -56,7 +56,7 @@ async function loadTrainingSamples(type) {
   grid.innerHTML = `<div class="training-loading"><i class="ti ti-loader ti-spin"></i> Loading samples…</div>`;
 
   try {
-    const url  = `/api/training?type=${encodeURIComponent(type)}`;
+    const url  = `/api/v1/training?type=${encodeURIComponent(type)}`;
     const res  = await fetch(url);
     const data = await res.json();
 

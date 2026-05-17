@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!tbody) return;   // Not on the index page
 
   try {
-    const res  = await fetch("/api/history?page=1&per_page=5");
+    const res  = await fetch("/api/v1/history?page=1&per_page=5");
     const data = await res.json();
 
     if (!data.success || !data.items.length) {

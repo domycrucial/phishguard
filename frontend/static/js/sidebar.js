@@ -49,13 +49,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function loadSidebarStats() {
   try {
-    const res  = await fetch("/api/stats");
+    const res  = await fetch("/api/v1/stats");
     const data = await res.json();
     if (!data.success) return;
     const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
     set("sidebarTotal",     data.total);
     set("sidebarPhishing",  data.phishing);
-    set("sidebarSuspicious",data.suspicious);
     set("sidebarLegitimate",data.legitimate);
   } catch (_) {}
 }

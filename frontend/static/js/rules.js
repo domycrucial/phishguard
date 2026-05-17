@@ -45,7 +45,7 @@ async function loadRules() {
   tbody.innerHTML = `<tr><td colspan="7" class="table-empty"><i class="ti ti-loader ti-spin"></i> Loading rules…</td></tr>`;
 
   try {
-    const res  = await fetch("/api/rules");
+    const res  = await fetch("/api/v1/rules");
     const data = await res.json();
 
     if (!data.success) throw new Error("API error");
@@ -143,7 +143,7 @@ function applyClientFilter() {
 // ═══════════════════════════════════════════════════
 async function toggleRule(ruleDbId, enabled) {
   try {
-    const res = await fetch(`/api/rules/${ruleDbId}`, {
+    const res = await fetch(`/api/v1/rules/${ruleDbId}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ is_enabled: enabled }),
@@ -208,7 +208,7 @@ async function submitCreateRule() {
   };
 
   try {
-    const res  = await fetch("/api/rules", {
+    const res  = await fetch("/api/v1/rules", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(payload),
@@ -287,7 +287,7 @@ async function saveEditRule() {
   };
 
   try {
-    const res  = await fetch(`/api/rules/${editingRuleId}`, {
+    const res  = await fetch(`/api/v1/rules/${editingRuleId}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(payload),

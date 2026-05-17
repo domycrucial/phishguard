@@ -47,7 +47,7 @@ async function loadDashboard() {
 // ═══════════════════════════════════════════════════
 async function loadStats() {
   try {
-    const res  = await fetch("/api/stats");
+    const res  = await fetch("/api/v1/stats");
     const data = await res.json();
 
     if (!data.success) return;
@@ -55,7 +55,6 @@ async function loadStats() {
     // ── Stats cards ──
     setEl("dashTotal",      data.total);
     setEl("dashPhishing",   data.phishing);
-    setEl("dashSuspicious", data.suspicious);
     setEl("dashLegitimate", data.legitimate);
     setEl("dashAvgScore",   data.avg_risk_score?.toFixed(1) || "0");
 
@@ -142,9 +141,9 @@ function renderBreakdownChart(data) {
 
   if (breakdownChartInst) { breakdownChartInst.destroy(); breakdownChartInst = null; }
 
-  const labels = ["Phishing", "Suspicious", "Legitimate"];
-  const values = [data.phishing, data.suspicious, data.legitimate];
-  const colors = ["#DC2626", "#F59E0B", "#16A34A"];
+  const labels = ["Phishing", "Legitimate"];
+  const values = [data.phishing, data.legitimate];
+  const colors = ["#DC2626", "#16A34A"];
 
   breakdownChartInst = new Chart(canvas, {
     type: "doughnut",
@@ -219,7 +218,7 @@ async function loadHistory() {
   tbody.innerHTML = `<tr><td colspan="8" class="table-empty"><i class="ti ti-loader ti-spin"></i> Loading…</td></tr>`;
 
   try {
-    const url = `/api/history?page=${currentPage}&per_page=${perPage}&classification=${currentFilter}`;
+    const url = `/api/v1/history?page=${currentPage}&per_page=${perPage}&classification=${currentFilter}`;
     const res  = await fetch(url);
     const data = await res.json();
 
@@ -246,7 +245,7 @@ async function loadHistory() {
           <td>${Math.round(item.confidence * 100)}%</td>
           <td>${dateStr}</td>
           <td>
-            <a href="/api/export/${item.id}" target="_blank" class="btn btn-sm btn-outline"
+            <a href="/api/v1/export/${item.id}" target="_blank" class="btn btn-sm btn-outline"
                title="Download PDF report">
               <i class="ti ti-file-type-pdf"></i>
             </a>

@@ -12,7 +12,7 @@ Includes Tanzanian-context examples for local relevance.
 # Each entry contains:
 #   - id:            Unique identifier for the sample
 #   - title:         Short descriptive name for the training card
-#   - expected_type: "phishing" | "legitimate" | "suspicious"
+#   - expected_type: "phishing" | "legitimate"
 #   - difficulty:    "easy" | "medium" | "hard"
 #   - sender:        From: header value
 #   - subject:       Subject line
@@ -199,12 +199,10 @@ TRAINING_EMAILS: list[dict] = [
         ]
     },
 
-    # ── SUSPICIOUS EXAMPLES ─────────────────────────────────────────────
-
     {
         "id":            "train_006",
-        "title":         "Dubious Job Offer",
-        "expected_type": "suspicious",
+        "title":         "Money Mule / Fake Job Offer",
+        "expected_type": "phishing",
         "difficulty":    "medium",
         "sender":        "recruitment@jobs-africa-careers.com",
         "subject":       "Exciting Job Opportunity - Earn $5,000/month Working From Home",
@@ -221,18 +219,18 @@ TRAINING_EMAILS: list[dict] = [
             "HR Department"
         ),
         "hint": (
-            "This is suspicious but not definitively phishing. "
-            "Red flags: (1) URL shortener (bit.ly) hides real destination. "
-            "(2) Unrealistically high pay for minimal work. "
-            "(3) Unsolicited job offer to unknown recipient. "
-            "(4) Requests bank account. "
-            "This could be a money mule recruitment or a credential-harvesting landing page."
+            "This is a phishing / money mule recruitment email. "
+            "Red flags: (1) URL shortener (bit.ly) hides the real phishing landing page. "
+            "(2) Unrealistically high pay ($5,000/month) for 2 hours of work — classic lure. "
+            "(3) Unsolicited job offer requesting bank account details. "
+            "(4) No company name, phone number, or verifiable identity. "
+            "The goal is to recruit money mules or harvest banking credentials."
         ),
         "key_indicators": [
-            "URL shortener hides destination",
-            "Unrealistic financial promise",
+            "URL shortener conceals phishing destination",
+            "Unrealistic financial promise (lure)",
             "Requests bank account details",
-            "Unsolicited contact",
+            "No verifiable sender identity",
         ]
     },
 

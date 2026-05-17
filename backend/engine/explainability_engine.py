@@ -13,19 +13,14 @@ logger = logging.getLogger(__name__)
 TRANSLATIONS = {
     "en": {
         "legitimate":   "Legitimate",
-        "suspicious":   "Suspicious",
         "phishing":     "Phishing",
         "risk_low":     "Low Risk",
-        "risk_medium":  "Medium Risk",
+        "risk_medium":  "Elevated Risk",
         "risk_high":    "High Risk",
         "narrative_legitimate":
             "This email appears to be legitimate. The analysis examined {rule_count} potential "
             "indicators and found a risk score of {score}/100. "
             "{legit_note}No significant phishing patterns were detected.",
-        "narrative_suspicious":
-            "This email shows suspicious characteristics. {rule_count} rule(s) were triggered "
-            "with a risk score of {score}/100. {composite_note}"
-            "Exercise caution before clicking links or providing any information.",
         "narrative_phishing":
             "⚠️ WARNING: This email has strong indicators of a phishing attack. "
             "{rule_count} rule(s) triggered with a risk score of {score}/100. "
@@ -42,12 +37,8 @@ TRANSLATIONS = {
         "confidence_medium":     "Moderate Confidence",
         "confidence_low":        "Low Confidence",
         "recommendation_phishing":
-            "Recommended actions: Do NOT reply. Do NOT click any links. "
-            "Report to your IT Security team. Delete the email immediately.",
-        "recommendation_suspicious":
-            "Recommended actions: Verify the sender through a separate channel "
-            "(phone call using a number you already know). Do NOT provide credentials. "
-            "Contact IT Security if unsure.",
+            "Recommended actions: Do NOT reply. Do NOT click any links or open attachments. "
+            "Report to your IT Security team immediately. Delete the email.",
         "recommendation_legitimate":
             "This email appears safe. Stay vigilant — always verify unexpected "
             "requests through official channels before acting.",
@@ -56,19 +47,14 @@ TRANSLATIONS = {
     },
     "sw": {
         "legitimate":   "Halali",
-        "suspicious":   "Inashuku",
         "phishing":     "Udanganyifu",
         "risk_low":     "Hatari Ndogo",
-        "risk_medium":  "Hatari ya Wastani",
+        "risk_medium":  "Hatari Iliyoinuliwa",
         "risk_high":    "Hatari Kubwa",
         "narrative_legitimate":
             "Barua pepe hii inaonekana kuwa halali. Uchambuzi ulitathmini viashiria {rule_count} "
             "na kupata alama ya hatari ya {score}/100. "
             "{legit_note}Hakuna mfumo wa udanganyifu mkubwa uliogundulika.",
-        "narrative_suspicious":
-            "Barua pepe hii inaonyesha sifa za kushuku. Sheria {rule_count} zilianzishwa "
-            "na alama ya hatari ya {score}/100. {composite_note}"
-            "Kuwa makini kabla ya kubonyeza viungo au kutoa taarifa yoyote.",
         "narrative_phishing":
             "⚠️ ONYO: Barua pepe hii ina dalili kali za shambulio la udanganyifu. "
             "Sheria {rule_count} zilianzishwa na alama ya hatari ya {score}/100. "
@@ -85,11 +71,8 @@ TRANSLATIONS = {
         "confidence_medium":     "Uhakika wa Wastani",
         "confidence_low":        "Uhakika Mdogo",
         "recommendation_phishing":
-            "Hatua zinazopendekezwa: USIIJIBU. USIBONYEZE viungo vyovyote. "
-            "Ripoti kwa Usalama wa IT. Futa barua pepe mara moja.",
-        "recommendation_suspicious":
-            "Hatua zinazopendekezwa: Thibitisha mtumaji kupitia njia nyingine. "
-            "Usitoe nywila. Wasiliana na Usalama wa IT ukishindwa.",
+            "Hatua zinazopendekezwa: USIIJIBU. USIBONYEZE viungo vyovyote au kufungua viambatisho. "
+            "Ripoti kwa Usalama wa IT mara moja. Futa barua pepe.",
         "recommendation_legitimate":
             "Barua pepe hii inaonekana salama. Daima kuwa macho na uthibitishe "
             "maombi yasiyotarajiwa kupitia njia rasmi.",
@@ -179,7 +162,7 @@ class ExplainabilityEngine:
                 "score":              score,
                 "classification":     T[clf],
                 "risk_level":         T["risk_high"] if score >= 55
-                                      else T["risk_medium"] if score >= 25
+                                      else T["risk_medium"] if score >= 35
                                       else T["risk_low"],
                 "confidence":         conf,
                 "confidence_label":   conf_label,

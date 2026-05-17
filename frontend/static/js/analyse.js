@@ -150,7 +150,7 @@ async function runAnalysis() {
 
   try {
     // ── API call ──
-    const res  = await fetch("/api/analyse", {
+    const res  = await fetch("/api/v1/analyse", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(payload),
@@ -196,7 +196,7 @@ async function runAnalysis() {
 //  RENDER RESULTS
 // ═══════════════════════════════════════════════════
 function renderResults(data) {
-  const clf = data.classification;   // "phishing" | "suspicious" | "legitimate"
+  const clf = data.classification;   // "phishing" | "legitimate"
   const score = data.risk_score;
   const exp   = data.explanation || {};
 
@@ -207,12 +207,12 @@ function renderResults(data) {
   const sub     = document.getElementById("verdictSub");
 
   // Remove previous classification classes
-  banner.classList.remove("banner-phishing", "banner-suspicious", "banner-legitimate");
+  banner.classList.remove("banner-phishing", "banner-legitimate");
   banner.classList.add(`banner-${clf}`);
 
-  // Set verdict icon + emoji
-  const iconMap   = { phishing: "🎣", suspicious: "⚠️", legitimate: "✅" };
-  const iconClass = { phishing: "icon-phishing", suspicious: "icon-suspicious", legitimate: "icon-legitimate" };
+  // Set verdict icon + emoji (binary: phishing or legitimate)
+  const iconMap   = { phishing: "🎣", legitimate: "✅" };
+  const iconClass = { phishing: "icon-phishing", legitimate: "icon-legitimate" };
   icon.textContent = iconMap[clf] || "❓";
   icon.className   = `verdict-icon ${iconClass[clf] || ""}`;
 
@@ -233,11 +233,9 @@ function renderResults(data) {
   document.getElementById("narrativeText").textContent     = exp.narrative || "";
   document.getElementById("recommendationText").textContent = exp.recommendations || "";
 
-  // Colour the narrative card border to match classification
+  // Colour the narrative card border to match binary classification
   const narrative = document.getElementById("narrativeCard");
-  narrative.style.borderLeftColor = clf === "phishing"   ? "var(--color-danger)"
-                                  : clf === "suspicious" ? "var(--color-warn)"
-                                  : "var(--color-safe)";
+  narrative.style.borderLeftColor = clf === "phishing" ? "var(--color-danger)" : "var(--color-safe)";
 
   // ── 4. Triggered Rules Cards ──
   renderRuleCards(exp.triggered_rules || []);
@@ -268,10 +266,9 @@ function animateGauge(score, clf) {
   const fillLength  = totalLength * (score / 100);   // How much of the arc to fill
   const dashOffset  = totalLength - fillLength;       // SVG offset = unfilled portion
 
-  // Set colour based on classification
+  // Set colour based on binary classification
   const colourMap = {
     phishing:   "#DC2626",   // Red
-    suspicious: "#F59E0B",   // Amber
     legitimate: "#16A34A",   // Green
   };
   arc.style.stroke          = colourMap[clf] || "#6B7280";
@@ -302,7 +299,7 @@ function renderRuleCards(rules) {
     container.innerHTML = `
       <div style="text-align:center;padding:40px;color:var(--text-muted)">
         <i class="ti ti-shield-check" style="font-size:40px;color:var(--color-safe)"></i>
-        <p style="margin-top:12px">No suspicious rules were triggered.</p>
+        <p style="margin-top:12px">No phishing rules were triggered. Email appears legitimate.</p>
       </div>`;
     return;
   }
@@ -493,7 +490,7 @@ async function exportPdf() {
     return;
   }
   const lang = document.getElementById("reportLang")?.value || "en";
-  const url  = `/api/export/${currentAnalysisId}?lang=${lang}`;
+  const url  = `/api/v1/export/${currentAnalysisId}?lang=${lang}`;
   showToast("Generating PDF report…", "info");
 
   // Open in new tab — browser handles the file download
@@ -510,7 +507,7 @@ async function submitFeedback(isCorrect) {
   }
 
   try {
-    const res = await fetch("/api/feedback", {
+    const res = await fetch("/api/v1/feedback", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({
@@ -535,15 +532,16 @@ async function submitFeedback(isCorrect) {
 // ═══════════════════════════════════════════════════
 async function loadHeroStats() {
   try {
-    const res  = await fetch("/api/stats");
+    const res  = await fetch("/api/v1/stats");
     const data = await res.json();
     if (data.success) {
-      document.getElementById("statTotal")?.textContent     !== undefined &&
-        (document.getElementById("statTotal").textContent     = data.total);
-      document.getElementById("statPhishing")?.textContent  !== undefined &&
-        (document.getElementById("statPhishing").textContent  = data.phishing);
-      document.getElementById("statSuspicious")?.textContent !== undefined &&
-        (document.getElementById("statSuspicious").textContent = data.suspicious);
+      const setStatEl = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      setStatEl("statTotal",      data.total);
+      setStatEl("statPhishing",   data.phishing);
+      setStatEl("statLegitimate", data.legitimate);
     }
   } catch (_) {
     // Silently fail — hero stats are non-critical

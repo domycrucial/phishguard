@@ -62,6 +62,7 @@ class CorrelationEngine:
 
     # Bonus weights for each composite pattern
     _BONUS_CREDENTIAL_PHISH: float   = 30.0  # critical: credential harvesting
+    _BONUS_BARE_CREDENTIAL: float    = 25.0  # high: credential request + no auth + social signal
     _BONUS_DOMAIN_SPOOFING: float    = 25.0  # high: lookalike + auth failure
     _BONUS_MALWARE_DELIVERY: float   = 25.0  # critical: executable + script
     _BONUS_BEC: float                = 20.0  # high: financial + impersonation
@@ -199,7 +200,53 @@ class CorrelationEngine:
                 ),
             })
 
-        # ── 6. Pure BEC (no brand impersonation — financial + secrecy + urgency) ──
+        # ── 6. Bare Credential Request (no authentication infrastructure) ────────
+        # This is the key composite for catching content-only phishing emails that
+        # previously fell into the "suspicious" zone but are clearly phishing:
+        #   "Dear Customer, send your account number and PIN"
+        #   "Congratulations! Reply with credit card details"
+        #   "Verify your identity — unusual activity detected"
+        #
+        # Fires when ALL of the following are true:
+        #   (a) Email explicitly requests credentials/sensitive data
+        #   (b) No DKIM or SPF authentication (unauthenticated sender)
+        #   (c) At least one social signal: prize lure, fear threat, generic
+        #       greeting, or free-email sender — prevents firing on legitimate
+        #       password reset emails that accidentally contain "password" in text
+        #
+        # WHY the social-signal guard:
+        #   A genuine corporate password reset: "Reset your password" → has
+        #   has_credential_request=True, but NO prize/fear/generic/free-email.
+        #   If submitted via form without headers, composite does NOT fire → ✓
+        #   A phishing email: "Dear Customer, send your PIN" → has generic greeting
+        #   → composite fires → pushed firmly into phishing territory → ✓
+        has_social_signal = (
+            fs.has_prize_language              # lottery / prize lures
+            or fs.has_fear_language            # arrest / legal threats
+            or fs.has_generic_greeting         # "Dear Customer/Winner/Employee"
+            or fs.sender_uses_free_email       # Gmail/Yahoo claiming to be bank
+        )
+        if (
+            fs.has_credential_request
+            and not fs.dkim_pass
+            and not fs.spf_pass
+            and has_social_signal
+        ):
+            result.composite_bonus += self._BONUS_BARE_CREDENTIAL
+            result.triggered_composites.append({
+                "name":        "Bare Credential Request",
+                "severity":    "high",
+                "description": (
+                    "The email explicitly requests sensitive credentials or personal data "
+                    "(PIN, password, account number, bank details) from an unauthenticated "
+                    "sender, combined with a social-engineering signal (generic greeting, "
+                    "prize lure, or fear threat). "
+                    "Legitimate organisations NEVER request credentials by email — "
+                    "this combination is a definitive phishing indicator."
+                ),
+            })
+
+        # ── 7. Pure BEC (no brand impersonation — financial + secrecy + urgency) ──
         # Generic BEC attacks don't forge known brands but pressure via urgency
         # and secrecy. Requires all three signals to avoid false positives on
         # legitimate urgent payment requests (which never demand secrecy).

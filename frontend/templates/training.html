@@ -80,7 +80,6 @@
     <div class="filter-bar" style="margin-top:4px;">
       <button class="filter-pill active" data-filter="all"><i class="ti ti-layout-grid" style="font-size:13px;"></i>&nbsp;All Samples</button>
       <button class="filter-pill" data-filter="phishing"><span class="badge badge-danger">Phishing</span></button>
-      <button class="filter-pill" data-filter="suspicious"><span class="badge badge-warn">Suspicious</span></button>
       <button class="filter-pill" data-filter="legitimate"><span class="badge badge-safe">Legitimate</span></button>
     </div>
 
@@ -103,10 +102,9 @@
     </div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer">
-      <p class="modal-question">Is this email phishing, suspicious, or legitimate?</p>
+      <p class="modal-question">Is this email phishing or legitimate?</p>
       <div class="modal-choices">
         <button class="choice-btn choice-phish" data-choice="phishing"><i class="ti ti-bug"></i>Phishing</button>
-        <button class="choice-btn choice-sus" data-choice="suspicious"><i class="ti ti-alert-triangle"></i>Suspicious</button>
         <button class="choice-btn choice-safe" data-choice="legitimate"><i class="ti ti-shield-check"></i>Legitimate</button>
       </div>
       <button class="btn btn-primary btn-lg" id="submitChoiceBtn" disabled><i class="ti ti-check"></i>Submit Answer</button>

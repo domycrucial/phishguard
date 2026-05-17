@@ -291,7 +291,7 @@ class FeatureEngine:
     _URGENCY_RE = re.compile(
         r"\b("
         r"urgent|immediately|"
-        r"account.{0,10}(suspended|closed|blocked|locked)|"
+        r"account.{0,10}(suspended|closed|blocked|locked|deactivated|terminated)|"
         r"verify.{0,10}(now|immediately|account)|"
         r"limited.{0,5}time|"
         r"act.{0,5}now|"
@@ -300,7 +300,14 @@ class FeatureEngine:
         r"final.{0,5}notice|"
         r"last.{0,5}warning|"
         r"action.{0,5}required|"
-        r"respond.{0,5}immediately"
+        r"respond.{0,5}immediately|"
+        # ── Added for binary phishing detection ──────────────────────────────
+        # "unusual activity" and similar are the #1 phishing urgency lure
+        r"unusual.{0,10}(activity|login|attempt|access|transaction)|"
+        r"suspicious.{0,10}(activity|login|transaction|access)|"
+        r"temporarily.{0,10}(limited|suspended|restricted|blocked)|"
+        r"within.{0,10}\d+.{0,10}(minute|hour)s?|"
+        r"in.{0,5}the.{0,5}next.{0,5}\d+.{0,10}(minute|hour)s?"
         r")\b",
         re.IGNORECASE | re.DOTALL
     )
@@ -318,7 +325,12 @@ class FeatureEngine:
         r"one.{0,5}time.{0,5}(password|code)|"
         r"security.{0,5}code|"
         r"bank.{0,5}(account|detail)|"
-        r"routing.{0,5}number"
+        r"routing.{0,5}number|"
+        # ── Added: common phishing credential-request phrases ─────────────────
+        r"account.{0,5}number|"
+        r"atm.{0,5}pin|"
+        r"id.{0,5}number|"
+        r"date.{0,5}of.{0,5}birth"
         r")\b",
         re.IGNORECASE | re.DOTALL
     )
@@ -383,7 +395,10 @@ class FeatureEngine:
         r"\bSir\b|"
         r"\bMadam\b|"
         r"Friend|"
-        r"Member"
+        r"Member|"
+        r"Winner|"         # prize-lure phishing: "Dear Winner"
+        r"Beneficiary|"    # advance-fee fraud: "Dear Beneficiary"
+        r"Employee"        # impersonation: "Dear Employee" (generic IT phishing)
         r")\b",
         re.IGNORECASE
     )

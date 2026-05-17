@@ -1,17 +1,22 @@
 """
 ============================================================
 backend/api/routes.py
-REST API Routes for PhishGuard.
+REST API v1 Routes for PhishGuard.
+
+All endpoints are mounted under /api/v1/ via the Flask Blueprint.
+
 Endpoints:
-  POST /api/analyse        – Run analysis on submitted email
-  GET  /api/history        – Paginated analysis history
-  GET  /api/stats          – Aggregated statistics for dashboard
-  GET  /api/rules          – List all rules
-  POST /api/rules          – Create a custom rule
-  PATCH /api/rules/<id>    – Update/toggle a rule
-  GET  /api/export/<id>    – Export analysis as PDF
-  POST /api/feedback       – Submit user feedback on classification
-  GET  /api/training       – Get training mode sample emails
+  POST  /api/v1/analyse          – Run analysis on submitted email
+  GET   /api/v1/history          – Paginated analysis history
+  GET   /api/v1/stats            – Aggregated statistics for dashboard
+  GET   /api/v1/rules            – List all rules
+  POST  /api/v1/rules            – Create a custom rule
+  PATCH /api/v1/rules/<id>       – Update/toggle a rule
+  GET   /api/v1/export/<id>      – Export analysis as PDF
+  POST  /api/v1/feedback         – Submit user feedback on classification
+  GET   /api/v1/training         – Get training mode sample emails
+
+Classification system: binary — "legitimate" or "phishing".
 All endpoints return JSON. Input is sanitised before processing.
 ============================================================
 """
@@ -136,7 +141,7 @@ def history():
     Query params:
       - page (int, default 1)
       - per_page (int, default 20, max 100)
-      - classification ("legitimate"|"suspicious"|"phishing"|"all")
+      - classification ("legitimate"|"phishing"|"all")
     """
     page           = max(1, request.args.get("page", 1, type=int))
     per_page       = min(100, request.args.get("per_page", 20, type=int))
@@ -149,8 +154,8 @@ def history():
         .order_by(AnalysisResult.analysed_at.desc())   # Newest first
     )
 
-    # --- Apply optional classification filter ---
-    if classification in ("legitimate", "suspicious", "phishing"):
+    # --- Apply optional classification filter (binary system: legitimate | phishing) ---
+    if classification in ("legitimate", "phishing"):
         query = query.filter(AnalysisResult.classification == classification)
 
     # --- Execute paginated query ---
@@ -215,22 +220,22 @@ def stats():
             "success":       True,
             "total":         0,
             "legitimate":    0,
-            "suspicious":    0,
             "phishing":      0,
             "avg_risk_score":0.0,
             "top_rules":     [],
             "trend":         [],
         })
 
-    # --- Count by classification ---
+    # --- Count by classification (binary: legitimate | phishing) ---
     clf_counts = (
         db.session.query(AnalysisResult.classification, func.count(AnalysisResult.id))
         .group_by(AnalysisResult.classification)
         .all()
     )
-    counts = {"legitimate": 0, "suspicious": 0, "phishing": 0}
+    counts = {"legitimate": 0, "phishing": 0}
     for clf, cnt in clf_counts:
-        counts[clf] = cnt
+        if clf in counts:
+            counts[clf] = cnt
 
     # --- Average risk score ---
     avg_score = db.session.query(func.avg(AnalysisResult.risk_score)).scalar() or 0.0
@@ -282,7 +287,6 @@ def stats():
         "success":        True,
         "total":          total,
         "legitimate":     counts.get("legitimate", 0),
-        "suspicious":     counts.get("suspicious", 0),
         "phishing":       counts.get("phishing", 0),
         "avg_risk_score": round(float(avg_score), 2),
         "top_rules":      top_rules,
@@ -503,13 +507,13 @@ def get_training_emails():
     Return a curated set of sample emails for the Training Mode.
     Includes both legitimate and phishing examples with expected labels.
     Query params:
-      - type ("phishing"|"legitimate"|"suspicious"|"all")
+      - type ("phishing"|"legitimate"|"all")
     """
     email_type = request.args.get("type", "all")
 
     samples = TRAINING_EMAILS   # Loaded from utils/training_data.py
 
-    if email_type in ("phishing", "legitimate", "suspicious"):
+    if email_type in ("phishing", "legitimate"):
         samples = [e for e in samples if e.get("expected_type") == email_type]
 
     return jsonify({
