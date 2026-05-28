@@ -39,7 +39,7 @@ class AnalysisResult(db.Model):
     email_id         = Column(Integer, ForeignKey("emails.id"), nullable=False, index=True)
     risk_score       = Column(Float,   nullable=False)
     classification   = Column(
-        Enum("legitimate", "suspicious", "phishing", name="classification_enum"),
+        Enum("legitimate", "phishing", name="classification_enum"),
         nullable=False
     )
     confidence       = Column(Float,   nullable=False, default=0.0)
@@ -117,7 +117,7 @@ class UserFeedback(db.Model):
                                 nullable=False, unique=True)
     is_correct         = Column(Boolean, nullable=False)
     correct_label      = Column(
-        Enum("legitimate", "suspicious", "phishing", name="feedback_label_enum"),
+        Enum("legitimate", "phishing", name="feedback_label_enum"),
         nullable=True
     )
     comment            = Column(Text, nullable=True)
@@ -127,12 +127,10 @@ class UserFeedback(db.Model):
 
 def init_db():
     """
-    Initialise the database: bind app, create tables, run migrations, sync rules.
-    Must be called inside an active Flask app context.
+    Initialise the database: create tables, run column migrations, sync rules.
+    Must be called inside an active Flask app context AFTER db.init_app(app).
+    The app factory (app.py) calls db.init_app(app) before calling this function.
     """
-    from flask import current_app
-    # Bind the app to the db instance (factory pattern)
-    db.init_app(current_app._get_current_object())
     # Create any tables that don't exist yet (no-op for existing tables)
     db.create_all()
     # Safely add columns added after the initial deployment

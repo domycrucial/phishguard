@@ -17,6 +17,7 @@ COMPOSITE PATTERNS DETECTED
 3. Malware Delivery        — dangerous attachment + HTML script content
 4. Business Email Compromise — financial request + sender impersonation + urgency
 5. Social Engineering      — prize/authority language + fear pressure + external link
+6. Employment Offer Scam   — remote-job lure + generic greeting + external URL
 
 FALSE-POSITIVE REDUCTION
 ------------------------
@@ -67,6 +68,7 @@ class CorrelationEngine:
     _BONUS_MALWARE_DELIVERY: float   = 25.0  # critical: executable + script
     _BONUS_BEC: float                = 20.0  # high: financial + impersonation
     _BONUS_SOCIAL_ENGINEERING: float = 15.0  # medium: prize/fear combo
+    _BONUS_EMPLOYMENT_SCAM: float    = 25.0  # high: fake job offer + generic greeting + URL
     _DEDUCT_LEGITIMATE: float        = 20.0  # legitimacy cluster deduction
 
     def correlate(
@@ -263,6 +265,29 @@ class CorrelationEngine:
                     "Urgent financial request combined with explicit secrecy demands. "
                     "Legitimate payment requests never ask recipients to keep them secret. "
                     "This combination is the hallmark of CEO-fraud / BEC attacks."
+                ),
+            })
+
+        # ── 6b. Employment Offer Scam ────────────────────────────────────────
+        # Unsolicited remote-job offer + generic greeting + external URL.
+        # Pattern: "Dear Candidate, we reviewed your profile — remote position
+        # $5,000/month — download employment form at <url>"
+        # All three must co-occur: reduces false positives on genuine recruiter
+        # emails that include salary information with a personalised greeting.
+        if (
+            fs.has_remote_work_scam
+            and fs.has_generic_greeting
+            and fs.url_count > 0
+        ):
+            result.composite_bonus += self._BONUS_EMPLOYMENT_SCAM
+            result.triggered_composites.append({
+                "name":        "Employment Offer Scam",
+                "severity":    "high",
+                "description": (
+                    "An unsolicited job offer with salary details or employment form "
+                    "combined with a generic impersonal greeting and an external link. "
+                    "Legitimate recruiters personalise their outreach; this cluster "
+                    "indicates a money-mule recruitment or credential-harvesting campaign."
                 ),
             })
 

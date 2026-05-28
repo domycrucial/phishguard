@@ -252,16 +252,13 @@ class AnalysisPipeline:
             logger.error(f"[{trace_id}] Persistence failed: {exc}")
         metrics["persist_ms"] = self._ms(t)
 
-        # Structured final log entry (machine-parseable)
-        logger.info({
-            "trace_id":         trace_id,
-            "pipeline_version": self.PIPELINE_VERSION,
-            "risk_score":       scoring.risk_score,
-            "classification":   scoring.classification,
-            "confidence":       scoring.confidence,
-            "rules_triggered":  len(matches),
-            "processing_ms":    processing_ms,
-        })
+        # Structured final log entry
+        logger.info(
+            "[Pipeline] trace=%s ver=%s score=%.1f class=%s conf=%.2f rules=%d ms=%.1f",
+            trace_id, self.PIPELINE_VERSION,
+            scoring.risk_score, scoring.classification,
+            scoring.confidence, len(matches), processing_ms,
+        )
 
         # ── Build and return the response dict ────────────────────────────────
         return {

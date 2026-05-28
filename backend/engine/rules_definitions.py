@@ -148,8 +148,8 @@ ALL_RULES: list = [
     {"rule_id": "KW_001", "name": "Urgency and threat language",
      "category": "content_keyword", "weight": 1.5, "is_enabled": True, "is_custom": False,
      "description": "Urgency or threat language pressures the recipient into acting without "
-                    "thinking. Includes classic phishing lures: 'URGENT', 'account suspended', "
-                    "'unusual activity', 'suspicious login', 'verify now'. "
+                    "thinking. Includes account-threat lures ('account suspended', 'unusual activity') "
+                    "and job-scam pressure ('positions limited', 'interviews close today'). "
                     "Weight MODERATE — many legitimate automated emails also use urgency language.",
      "pattern": r"\b(urgent|immediately|account.{0,10}(suspended|closed|blocked|locked|terminated|deactivated)|"
                 r"verify.{0,10}(now|immediately)|limited.{0,5}time|act.{0,5}now|"
@@ -157,7 +157,12 @@ ALL_RULES: list = [
                 r"unusual.{0,10}(activity|login|attempt|access|transaction)|"
                 r"suspicious.{0,10}(activity|login|transaction)|"
                 r"access.{0,10}(revoked|terminated|suspended)|"
-                r"temporarily.{0,10}(limited|suspended|restricted))\b"},
+                r"temporarily.{0,10}(limited|suspended|restricted)|"
+                r"(position|seat|slot|opening)s?.{0,10}(are.{0,5})?limited|"
+                r"(position|seat|slot|opening)s?.{0,10}fill(ing|ed).{0,10}fast|"
+                r"interviews?.{0,10}close.{0,10}today|"
+                r"closing.{0,10}(today|soon|shortly|immediately)|"
+                r"limited.{0,10}(position|seat|slot|opening)s?)\b"},
 
     {"rule_id": "URGENCY_002", "name": "Short time-window access pressure",
      "category": "content_keyword", "weight": 1.5, "is_enabled": True, "is_custom": False,
@@ -206,11 +211,12 @@ ALL_RULES: list = [
 
     {"rule_id": "KW_005", "name": "Generic impersonal greeting",
      "category": "content_keyword", "weight": 0.8, "is_enabled": True, "is_custom": False,
-     "description": "A generic greeting ('Dear Customer', 'Dear Winner', 'Dear Employee') "
+     "description": "A generic greeting ('Dear Customer', 'Dear Candidate', 'Dear Winner') "
                     "indicates a mass phishing campaign unable to personalise. Weight LOW — "
                     "many legitimate bulk emails also use generic greetings.",
      "pattern": r"^.{0,50}\bDear\s+(Customer|User|Account.Holder|Valued.Client|Member|"
-                r"Subscriber|Sir/Madam|Client|Beneficiary|Winner|Employee)\b"},
+                r"Subscriber|Sir/Madam|Client|Beneficiary|Winner|Employee|"
+                r"Candidate|Applicant|Investor|Recipient)\b"},
 
     {"rule_id": "KW_006", "name": "Authority impersonation (government/tax)",
      "category": "content_keyword", "weight": 1.5, "is_enabled": True, "is_custom": False,
@@ -269,9 +275,25 @@ ALL_RULES: list = [
     {"rule_id": "SOC_005", "name": "Fake work-from-home / easy money offer",
      "category": "content_keyword", "weight": 1.5, "is_enabled": True, "is_custom": False,
      "description": "Unsolicited work-from-home or easy income offers recruit money mules "
-                    "or harvest personal/banking credentials.",
+                    "or harvest personal/banking credentials. Includes generic 'remote position "
+                    "with salary' job-scam lures and 'download the employment form' hooks.",
      "pattern": r"\b(work.from.home.{0,20}(earn|income|salary)|easy.{0,10}income|"
-                r"no.experience.needed.{0,20}earn|earn.{0,15}per.week.{0,20}from.home)\b"},
+                r"no.experience.needed.{0,20}earn|earn.{0,15}per.week.{0,20}from.home|"
+                r"remote.{0,15}(position|role|job|work|opportunity).{0,50}(salary|\$[\d,]+|per.month|per.week)|"
+                r"starting.{0,10}salary.{0,30}(\$[\d,]+|\d{3,}).{0,10}(month|week|year)|"
+                r"download.{0,20}(employment|job|application|onboarding).{0,15}form|"
+                r"complete.{0,15}(employment|onboarding|application).{0,10}form)\b"},
+
+    {"rule_id": "KW_009", "name": "Unsolicited employment offer scam",
+     "category": "content_keyword", "weight": 2.0, "is_enabled": True, "is_custom": False,
+     "description": "Unsolicited job offers citing a profile review, a specific salary, and a "
+                    "form to complete are classic recruitment scams that harvest personal data "
+                    "or recruit money mules. 'We reviewed your profile and are pleased to offer' "
+                    "is the signature phrase of this attack type.",
+     "pattern": r"\b((reviewed|selected).{0,20}(your|their).{0,15}(profile|resume|cv|application)|"
+                r"pleased.{0,15}(to.{0,5})?(offer|hire|recruit).{0,20}(you.{0,10})?(remote|position|role)|"
+                r"remote.{0,15}position.{0,30}starting.{0,10}salary|"
+                r"employment.{0,10}(form|application).{0,20}(download|complete|fill))\b"},
 
     {"rule_id": "SOC_006", "name": "Credential verification or account restoration pressure",
      "category": "content_keyword", "weight": 2.0, "is_enabled": True, "is_custom": False,

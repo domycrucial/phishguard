@@ -14,6 +14,9 @@ Version : 2.0.0
 
 import logging
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv   # Load .env before Config reads env vars
 from flask import Flask, render_template
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -23,6 +26,9 @@ from backend.api.routes import api_blueprint
 from backend.models.database import init_db
 from backend.utils.config import Config
 
+# Load .env from the project root so DB credentials are available at startup
+load_dotenv(Path(__file__).parent / ".env")
+
 
 def create_app(config_class=Config) -> Flask:
     """
@@ -30,12 +36,17 @@ def create_app(config_class=Config) -> Flask:
     Using a factory enables proper testing isolation and multiple
     app instances with different configurations.
     """
+   
     app = Flask(
         __name__,
         template_folder="frontend/templates",
-        static_folder="frontend/static"
+        static_folder= "frontend/static",
     )
     app.config.from_object(config_class)
+
+    # ── Bind SQLAlchemy to the app (must happen before any DB operations) ─
+    from backend.models.database import db as _db
+    _db.init_app(app)
 
     # ── Security: CORS restricted to same origin in production ──────────
     CORS(app, resources={r"/api/v1/*": {"origins": app.config.get("CORS_ORIGINS", "*")}})
@@ -51,7 +62,7 @@ def create_app(config_class=Config) -> Flask:
     # ── Register all API routes under /api/v1 ────────────────────────────
     app.register_blueprint(api_blueprint, url_prefix="/api/v1")
 
-    # ── Database initialisation ──────────────────────────────────────────
+    # ── Database initialisation (tables + rule sync) ─────────────────────
     with app.app_context():
         init_db()
 
@@ -89,8 +100,7 @@ def create_app(config_class=Config) -> Flask:
         from flask import jsonify
         return jsonify({"status": "ok", "version": "2.0.0"})
 
-    app.logger.info("PhishGuard v2 initialised successfully.")
-    app.logger.info("https://localhost:5000/")
+    app.logger.info("PhishGuard v2 initialised — http://127.0.0.1:5000/")
     return app
 
 

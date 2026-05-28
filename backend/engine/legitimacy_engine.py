@@ -233,6 +233,7 @@ class LegitimacyEngine:
             and not fs.has_secrecy_request         # no BEC confidentiality demands
             and not fs.has_gift_card_request       # no gift card scams
             and not fs.has_crypto_request          # no cryptocurrency demands
+            and not fs.has_remote_work_scam        # no fake job / money-mule offer
             and fs.link_text_mismatch_count == 0   # no visual link deception
             and not fs.has_ip_url                  # no bare IP addresses
             and not fs.has_suspicious_tld          # no .tk/.xyz high-abuse TLDs

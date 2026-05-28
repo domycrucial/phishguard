@@ -301,13 +301,19 @@ class FeatureEngine:
         r"last.{0,5}warning|"
         r"action.{0,5}required|"
         r"respond.{0,5}immediately|"
-        # ── Added for binary phishing detection ──────────────────────────────
-        # "unusual activity" and similar are the #1 phishing urgency lure
+        # ── Binary phishing: account activity lures ─────────────────────────
         r"unusual.{0,10}(activity|login|attempt|access|transaction)|"
         r"suspicious.{0,10}(activity|login|transaction|access)|"
         r"temporarily.{0,10}(limited|suspended|restricted|blocked)|"
         r"within.{0,10}\d+.{0,10}(minute|hour)s?|"
-        r"in.{0,5}the.{0,5}next.{0,5}\d+.{0,10}(minute|hour)s?"
+        r"in.{0,5}the.{0,5}next.{0,5}\d+.{0,10}(minute|hour)s?|"
+        # ── Job scam urgency: "positions limited", "interviews close today" ──
+        # These appear in fake job offers to create pressure without account threats
+        r"(position|seat|slot|opening)s?.{0,10}(are.{0,5})?limited|"
+        r"(position|seat|slot|opening)s?.{0,10}fill(ing|ed).{0,10}fast|"
+        r"interviews?.{0,10}close.{0,10}today|"
+        r"closing.{0,10}(today|soon|shortly|immediately)|"
+        r"limited.{0,10}(position|seat|slot|opening)s?"
         r")\b",
         re.IGNORECASE | re.DOTALL
     )
@@ -398,7 +404,11 @@ class FeatureEngine:
         r"Member|"
         r"Winner|"         # prize-lure phishing: "Dear Winner"
         r"Beneficiary|"    # advance-fee fraud: "Dear Beneficiary"
-        r"Employee"        # impersonation: "Dear Employee" (generic IT phishing)
+        r"Employee|"       # impersonation: "Dear Employee" (generic IT phishing)
+        r"Candidate|"      # fake job offer: "Dear Candidate"
+        r"Applicant|"      # fake recruitment: "Dear Applicant"
+        r"Investor|"       # investment scam: "Dear Investor"
+        r"Recipient"       # advance-fee: "Dear Recipient"
         r")\b",
         re.IGNORECASE
     )
@@ -466,13 +476,24 @@ class FeatureEngine:
         re.IGNORECASE | re.DOTALL
     )
 
-    # Remote work / easy income scam (money mule recruitment)
+    # Remote work / fake job offer scam (money mule and credential harvesting)
+    # Extended to catch unsolicited job offers that don't say "work from home" explicitly
     _REMOTE_WORK_RE = re.compile(
         r"\b("
         r"work.from.home.{0,20}(earn|income|salary)|"
         r"easy.{0,10}income|"
         r"no.experience.needed.{0,20}earn|"
-        r"earn.{0,15}per.week.{0,20}from.home"
+        r"earn.{0,15}per.week.{0,20}from.home|"
+        # Fake remote job offer patterns:
+        # "remote position with a starting salary of $5,000" style lures
+        r"remote.{0,15}(position|role|job|work|opportunity).{0,50}(salary|\$[\d,]+|per.month|per.week)|"
+        r"starting.{0,10}salary.{0,30}(\$[\d,]+|\d{3,}).{0,10}(month|week|year)|"
+        # "please download the employment form" lure
+        r"download.{0,20}(employment|job|application|onboarding).{0,15}form|"
+        r"complete.{0,15}(employment|onboarding|application).{0,10}form|"
+        # "we reviewed your profile and are pleased to offer" pattern
+        r"(reviewed|selected).{0,20}(your|their).{0,15}(profile|resume|cv|application)|"
+        r"pleased.{0,15}(to.{0,5})?(offer|hire|recruit).{0,20}(you.{0,10})?(remote|position|role)"
         r")\b",
         re.IGNORECASE | re.DOTALL
     )

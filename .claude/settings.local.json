@@ -4,7 +4,8 @@
       "Bash(python -c ' *)",
       "Bash(venv/Scripts/python.exe -m pytest tests/test_rule_engine.py -v)",
       "Bash(venv/Scripts/pip.exe install *)",
-      "Bash(venv/Scripts/python.exe -c ' *)"
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(python *)"
     ]
   }
 }

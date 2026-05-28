@@ -24,6 +24,7 @@ All endpoints return JSON. Input is sanitised before processing.
 # Standard library imports
 import json        # For serialisation helpers
 import logging
+import base64      # For decoding browser-masked email content
 from typing import Any, Dict
 
 # Flask imports
@@ -58,6 +59,28 @@ def error_response(message: str, status: int = 400) -> Any:
     return jsonify({"success": False, "error": message}), status
 
 
+def _decode_field(value: str) -> str:
+    """
+    Decode a browser-masked field that was base64-encoded on the client.
+    The browser uses encodeURIComponent + btoa (handles full Unicode); we reverse
+    with base64decode + percent-decode to recover the original UTF-8 string.
+    Returns value unchanged if decoding fails (plain-text fallback).
+    """
+    if not value:
+        return value
+    try:
+        from urllib.parse import unquote
+        # Reverse of browser: btoa(encodeURIComponent(text)) → str
+        raw_bytes = base64.b64decode(value + "==")   # pad in case truncated
+        # Each byte was originally a percent-encoded UTF-8 byte
+        percent_str = "".join(
+            chr(b) if b < 128 else f"%{b:02X}" for b in raw_bytes
+        )
+        return unquote(percent_str, encoding="utf-8")
+    except Exception:
+        return value  # Not encoded — treat as plain text
+
+
 # ══════════════════════════════════════════════════════════
 #  POST /api/analyse
 # ══════════════════════════════════════════════════════════
@@ -75,14 +98,21 @@ def analyse():
     if not data:
         return error_response("Request body must be valid JSON.")
 
+    # --- Detect browser-masked (base64-encoded) submission ---
+    # When the UI masking feature is active, the client sets _encrypted=True
+    # and base64-encodes all content fields so they appear as ****** in the DOM.
+    # We decode them here before sanitisation and analysis.
+    encrypted = bool(data.get("_encrypted", False))
+    _dec = _decode_field if encrypted else (lambda v: v)  # identity when plain
+
     # --- Sanitise all string inputs to prevent XSS and SQL injection ---
-    sender    = sanitise_input(data.get("sender",    ""), max_length=512)
-    subject   = sanitise_input(data.get("subject",   ""), max_length=1024)
-    body_text = sanitise_input(data.get("body_text", ""), max_length=100_000)
-    body_html = sanitise_input(data.get("body_html", ""), max_length=500_000, allow_html=True)
-    headers   = sanitise_input(data.get("headers",   ""), max_length=20_000)
-    recipient = sanitise_input(data.get("recipient", ""), max_length=512)
-    raw_email = sanitise_input(data.get("raw_email", ""), max_length=600_000, allow_html=True)
+    sender    = sanitise_input(_dec(data.get("sender",    "")), max_length=512)
+    subject   = sanitise_input(_dec(data.get("subject",   "")), max_length=1024)
+    body_text = sanitise_input(_dec(data.get("body_text", "")), max_length=100_000)
+    body_html = sanitise_input(_dec(data.get("body_html", "")), max_length=500_000, allow_html=True)
+    headers   = sanitise_input(_dec(data.get("headers",   "")), max_length=20_000)
+    recipient = sanitise_input(_dec(data.get("recipient", "")), max_length=512)
+    raw_email = sanitise_input(_dec(data.get("raw_email", "")), max_length=600_000, allow_html=True)
     language  = data.get("language", "en")
 
     # --- Validate language code ---
@@ -391,7 +421,7 @@ def update_rule(rule_id: int):
     Toggle a rule's enabled state, or update weight/description.
     Used by the Rule Management UI toggle switches.
     """
-    rule = Rule.query.get_or_404(rule_id)   # 404 if rule doesn't exist
+    rule = db.get_or_404(Rule, rule_id)   # 404 if rule doesn't exist
     data = request.get_json(silent=True) or {}
 
     # --- Apply only provided fields (partial update) ---
@@ -420,8 +450,8 @@ def export_pdf(analysis_id: int):
     Uses WeasyPrint to render an HTML template to PDF.
     """
     # --- Load the analysis result with eager-loaded relationships ---
-    analysis = AnalysisResult.query.get_or_404(analysis_id)
-    email_row = Email.query.get_or_404(analysis.email_id)
+    analysis = db.get_or_404(AnalysisResult, analysis_id)
+    email_row = db.get_or_404(Email, analysis.email_id)
 
     triggered = (
         db.session.query(TriggeredRule, Rule)
@@ -475,7 +505,7 @@ def submit_feedback():
         return error_response("Fields 'analysis_result_id' and 'is_correct' are required.")
 
     # --- Verify the analysis exists ---
-    analysis = AnalysisResult.query.get(analysis_id)
+    analysis = db.session.get(AnalysisResult, analysis_id)
     if not analysis:
         return error_response(f"Analysis {analysis_id} not found.", 404)
 

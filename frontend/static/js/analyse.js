@@ -8,11 +8,123 @@
  *   - Rendering rule cards, category chart, email info
  *   - Feedback submission
  *   - PDF export trigger
+ *   - Content masking: email content is visually masked after paste
+ *     and base64-encoded before transmission for privacy
  */
 
 // ─── State ────────────────────────────────────────────
-let currentAnalysisId = null;   // Track the last analysis ID for feedback/export
+let currentAnalysisId = null;       // Track the last analysis ID for feedback/export
 let categoryChartInstance = null;   // Chart.js instance (must destroy before re-creating)
+
+// ─── Masking State ────────────────────────────────────
+// Stores the real (unmasked) content for each field ID.
+// Masking replaces visible textarea text with ● chars while keeping
+// the real content here so it can be encoded and sent to the server.
+const _realContent = {};  // { fieldId: "actual email text" }
+const _maskTimers  = {};  // debounce timers so we don't mask on every keystroke
+
+// IDs of all textarea fields that should support content masking
+const MASKABLE_FIELDS = [
+  "inputBody", "inputHtml", "inputHeaders", "inputRaw"
+];
+
+// ─── Content Masking ──────────────────────────────────
+
+/**
+ * Base64-encodes a UTF-8 string for transmission.
+ * The server's _decode_field() decodes this before analysis.
+ */
+function b64Encode(str) {
+  try {
+    // encodeURIComponent handles non-ASCII, btoa handles the rest
+    return btoa(encodeURIComponent(str).replace(
+      /%([0-9A-F]{2})/g,
+      (_, p) => String.fromCharCode(parseInt(p, 16))
+    ));
+  } catch (_) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+}
+
+/**
+ * Replace textarea content with ● characters (same count as words).
+ * Stores the real value in _realContent for later submission.
+ */
+function maskField(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el || !el.value.trim()) return;
+
+  // Only store if we don't already have a stored value (avoid double-masking)
+  if (!_realContent[fieldId]) {
+    _realContent[fieldId] = el.value;
+  }
+
+  // Replace visible text with bullet chars — same character count as words
+  const wordCount = el.value.split(/\s+/).filter(Boolean).length;
+  el.value = Array(wordCount).fill("●●●●●").join(" ");
+
+  // Visual feedback: set lock icon to "locked" state
+  _setMaskIcon(fieldId, true);
+}
+
+/**
+ * Restore the real content into the textarea.
+ */
+function unmaskField(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+
+  if (_realContent[fieldId] !== undefined) {
+    el.value = _realContent[fieldId];
+  }
+  _setMaskIcon(fieldId, false);
+}
+
+/**
+ * Toggle mask/unmask for a single field.
+ */
+function toggleMask(fieldId) {
+  if (_realContent[fieldId] !== undefined) {
+    // Currently masked — reveal it
+    unmaskField(fieldId);
+    delete _realContent[fieldId];
+  } else {
+    maskField(fieldId);
+  }
+}
+
+/**
+ * Update the lock-icon button state (locked / unlocked).
+ * Adds .is-locked CSS class so the button turns amber when content is hidden.
+ */
+function _setMaskIcon(fieldId, isLocked) {
+  const btn = document.getElementById(`mask-${fieldId}`);
+  if (!btn) return;
+  const icon = btn.querySelector("i");
+  if (icon) {
+    icon.className = isLocked ? "ti ti-lock" : "ti ti-lock-open";
+  }
+  btn.classList.toggle("is-locked", isLocked);
+  btn.title = isLocked ? "Content masked — click to reveal" : "Click to mask content";
+}
+
+/**
+ * Auto-mask a field 1.5 s after the user stops typing/pasting.
+ * Called by the input/paste event listeners set up in DOMContentLoaded.
+ */
+function scheduleAutoMask(fieldId) {
+  clearTimeout(_maskTimers[fieldId]);
+  _maskTimers[fieldId] = setTimeout(() => maskField(fieldId), 1500);
+}
+
+/**
+ * Get the real value for a field — from _realContent if masked, else from DOM.
+ */
+function getRealValue(fieldId) {
+  return _realContent[fieldId] !== undefined
+    ? _realContent[fieldId]
+    : (document.getElementById(fieldId)?.value || "");
+}
 
 // ─── DOM References ───────────────────────────────────
 const analyseBtn     = document.getElementById("analyseBtn");
@@ -62,12 +174,26 @@ document.addEventListener("DOMContentLoaded", () => {
   if (exportBtn) exportBtn.addEventListener("click", exportPdf);
 
   // Feedback buttons
-  document.querySelectorAll("[id^='feedbackCorrectBtn'], [id^='feedbackWrongBtn']").forEach(btn => {
-    btn.addEventListener("click", () => submitFeedback(btn.dataset.correct === "true"));
-  });
-  // Alias by ID
   document.getElementById("feedbackCorrectBtn")?.addEventListener("click", () => submitFeedback(true));
   document.getElementById("feedbackWrongBtn")?.addEventListener("click",   () => submitFeedback(false));
+
+  // ── Content Masking: auto-mask 1.5s after paste/type ──────────────────
+  // Each maskable field also has a toggle button (#mask-<fieldId>)
+  MASKABLE_FIELDS.forEach(fieldId => {
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+
+    // Auto-mask on paste after short delay
+    el.addEventListener("paste",  () => scheduleAutoMask(fieldId));
+    // Also auto-mask if user types a lot of content
+    el.addEventListener("input",  () => {
+      if (el.value.length > 100) scheduleAutoMask(fieldId);
+    });
+
+    // Wire the toggle button (lock icon beside each textarea)
+    const btn = document.getElementById(`mask-${fieldId}`);
+    if (btn) btn.addEventListener("click", () => toggleMask(fieldId));
+  });
 });
 
 // ═══════════════════════════════════════════════════
@@ -111,23 +237,28 @@ async function runAnalysis() {
   const isRawMode = document.getElementById("panel-raw") &&
                     !document.getElementById("panel-raw").hidden;
 
+  // Build payload — use getRealValue() so masked (●●●) fields send the real content.
+  // Content fields are base64-encoded; _encrypted:true tells the server to decode them.
   const payload = isRawMode
     ? {
-        raw_email: document.getElementById("inputRaw")?.value || "",
-        language:  lang,
+        _encrypted: true,
+        raw_email:  b64Encode(getRealValue("inputRaw")),
+        language:   lang,
       }
     : {
-        sender:    document.getElementById("inputSender")?.value    || "",
-        recipient: document.getElementById("inputRecipient")?.value || "",
-        subject:   document.getElementById("inputSubject")?.value   || "",
-        body_text: document.getElementById("inputBody")?.value      || "",
-        body_html: document.getElementById("inputHtml")?.value      || "",
-        headers:   document.getElementById("inputHeaders")?.value   || "",
-        language:  lang,
+        _encrypted: true,
+        sender:     b64Encode(document.getElementById("inputSender")?.value    || ""),
+        recipient:  b64Encode(document.getElementById("inputRecipient")?.value || ""),
+        subject:    b64Encode(document.getElementById("inputSubject")?.value   || ""),
+        body_text:  b64Encode(getRealValue("inputBody")),
+        body_html:  b64Encode(getRealValue("inputHtml")),
+        headers:    b64Encode(getRealValue("inputHeaders")),
+        language:   lang,
       };
 
-  // Require at least some content
-  const hasContent = Object.values(payload).some(v => v && v.trim && v.trim().length > 0);
+  // Require at least some actual email content (exclude meta fields)
+  const CONTENT_KEYS = ["raw_email","body_text","body_html","subject","sender"];
+  const hasContent = CONTENT_KEYS.some(k => payload[k] && payload[k].length > 0);
   if (!hasContent) {
     showToast("Please enter some email content to analyse.", "error");
     return;
@@ -464,6 +595,13 @@ function clearForm() {
    "inputHtml","inputHeaders","inputRaw"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
+  });
+
+  // Clear masked content store and reset all lock icons to unlocked
+  MASKABLE_FIELDS.forEach(id => {
+    delete _realContent[id];
+    clearTimeout(_maskTimers[id]);
+    _setMaskIcon(id, false);
   });
 
   // Reset gauge

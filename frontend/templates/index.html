@@ -110,26 +110,48 @@
           <input type="text" id="inputSubject" class="form-input" placeholder="e.g. URGENT: Your account has been suspended"/>
         </div>
         <div class="form-group">
-          <label for="inputBody" class="form-label" data-i18n="lbl_body">Email Body (Plain Text)</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <label for="inputBody" class="form-label" style="margin-bottom:0" data-i18n="lbl_body">Email Body (Plain Text)</label>
+            <button type="button" id="mask-inputBody" class="mask-toggle-btn" title="Click to mask content" aria-label="Toggle content masking">
+              <i class="ti ti-lock-open"></i>
+            </button>
+          </div>
           <textarea id="inputBody" class="form-textarea" rows="8"
             placeholder="Paste the email body here…&#10;&#10;Example:&#10;Dear Customer, your CRDB account is suspended.&#10;Verify now: http://crdb-secure.tk/login&#10;Enter your PIN immediately."></textarea>
+          <span class="mask-hint"><i class="ti ti-shield-lock" style="font-size:11px;"></i> Content auto-masks after paste — click <i class="ti ti-lock-open" style="font-size:11px;"></i> to toggle</span>
         </div>
         <details class="optional-section">
           <summary class="optional-toggle"><i class="ti ti-code" style="font-size:13px;margin-right:5px;"></i>HTML Body (optional)</summary>
-          <div class="form-group" style="margin-top:10px"><textarea id="inputHtml" class="form-textarea" rows="4" placeholder="Paste raw HTML of the email body…"></textarea></div>
+          <div class="form-group" style="margin-top:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <label for="inputHtml" class="form-label" style="margin-bottom:0">HTML Body</label>
+              <button type="button" id="mask-inputHtml" class="mask-toggle-btn" title="Click to mask content" aria-label="Toggle HTML content masking"><i class="ti ti-lock-open"></i></button>
+            </div>
+            <textarea id="inputHtml" class="form-textarea" rows="4" placeholder="Paste raw HTML of the email body…"></textarea>
+          </div>
         </details>
         <details class="optional-section">
           <summary class="optional-toggle"><i class="ti ti-list-details" style="font-size:13px;margin-right:5px;"></i>Email Headers (optional)</summary>
-          <div class="form-group" style="margin-top:10px"><textarea id="inputHeaders" class="form-textarea" rows="4" placeholder="Received-SPF: fail&#10;DKIM-Signature: …"></textarea></div>
+          <div class="form-group" style="margin-top:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <label for="inputHeaders" class="form-label" style="margin-bottom:0">Email Headers</label>
+              <button type="button" id="mask-inputHeaders" class="mask-toggle-btn" title="Click to mask content" aria-label="Toggle headers masking"><i class="ti ti-lock-open"></i></button>
+            </div>
+            <textarea id="inputHeaders" class="form-textarea" rows="4" placeholder="Received-SPF: fail&#10;DKIM-Signature: …"></textarea>
+          </div>
         </details>
       </div>
 
       <!-- RAW MODE -->
       <div class="tab-content" id="panel-raw" role="tabpanel" hidden>
         <div class="form-group">
-          <label for="inputRaw" class="form-label" data-i18n="lbl_raw">Full RFC-2822 Email</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <label for="inputRaw" class="form-label" style="margin-bottom:0" data-i18n="lbl_raw">Full RFC-2822 Email</label>
+            <button type="button" id="mask-inputRaw" class="mask-toggle-btn" title="Click to mask content" aria-label="Toggle raw email masking"><i class="ti ti-lock-open"></i></button>
+          </div>
           <textarea id="inputRaw" class="form-textarea mono" rows="16"
             placeholder="Paste the complete email source here (headers + body)…&#10;&#10;From: sender@example.com&#10;To: victim@company.com&#10;Subject: Test&#10;&#10;Email body here…"></textarea>
+          <span class="mask-hint"><i class="ti ti-shield-lock" style="font-size:11px;"></i> Content auto-masks after paste — click <i class="ti ti-lock-open" style="font-size:11px;"></i> to toggle</span>
         </div>
       </div>
 
