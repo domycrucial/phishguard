@@ -25,7 +25,7 @@ const _maskTimers  = {};  // debounce timers so we don't mask on every keystroke
 
 // IDs of all textarea fields that should support content masking
 const MASKABLE_FIELDS = [
-  "inputBody", "inputHtml", "inputHeaders", "inputRaw"
+  "inputBody", "inputRaw"
 ];
 
 // ─── Content Masking ──────────────────────────────────
@@ -126,6 +126,63 @@ function getRealValue(fieldId) {
     : (document.getElementById(fieldId)?.value || "");
 }
 
+/**
+ * Validates if the text content "looks" like an email.
+ * Rejects random gibberish, single letters, and non-email formats.
+ */
+function validateEmailContent(text, isRaw) {
+  const trimmed = text.trim();
+
+  // 1. Basic length check
+  if (trimmed.length < 15) {
+    return {
+      isValid: false,
+      message: "Content too short. Please paste a complete email or message."
+    };
+  }
+
+  // 2. Raw Email Validation (RFC-2822 structure)
+  if (isRaw) {
+    const commonHeaders = ["from:", "to:", "subject:", "date:", "received:", "content-type:"];
+    const lowerText = trimmed.toLowerCase();
+    const headersFound = commonHeaders.filter(h => lowerText.includes(h)).length;
+
+    // A raw email must have at least 2 common headers and some content
+    if (headersFound < 2) {
+      return {
+        isValid: false,
+        message: "Invalid Raw Format. A raw email must include standard headers (e.g., From, Subject, To)."
+      };
+    }
+  }
+  // 3. Body/Message Validation
+  else {
+    // Count spaces to detect "long single-word" gibberish
+    const spaceCount = (trimmed.match(/\s/g) || []).length;
+    const words = trimmed.split(/\s+/).filter(w => w.length > 1);
+
+    // Heuristic: A real email body should have spaces and multiple words
+    if (spaceCount < 3 || words.length < 4) {
+      return {
+        isValid: false,
+        message: "Invalid Email Format. Please paste a readable email body with complete sentences."
+      };
+    }
+
+    // Check for "Keyboard mashing" (too many consonants/randomness)
+    // If a word is longer than 25 chars without any punctuation/spaces, it's likely gibberish
+    const hasMasher = words.some(w => w.length > 25 && !w.includes(".") && !w.includes("/"));
+    if (hasMasher) {
+      return {
+        isValid: false,
+        message: "Content rejected. Random character strings are not valid email content."
+      };
+    }
+  }
+
+  return { isValid: true };
+}
+
 // ─── DOM References ───────────────────────────────────
 const analyseBtn     = document.getElementById("analyseBtn");
 const clearBtn       = document.getElementById("clearBtn");
@@ -146,12 +203,17 @@ const PROGRESS_STEPS = [
 
 // ─── Initialise ───────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("[PhishGuard] App ready.");
+
   // Load hero stats on page load
   loadHeroStats();
 
   // Wire up the tab switcher for input mode
   document.querySelectorAll(".tab[data-tab]").forEach(tab => {
-    tab.addEventListener("click", () => switchInputTab(tab.dataset.tab));
+    tab.addEventListener("click", (e) => {
+      e.preventDefault();
+      switchInputTab(tab.dataset.tab);
+    });
   });
 
   // Wire up result section tabs
@@ -183,11 +245,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById(fieldId);
     if (!el) return;
 
-    // Auto-mask on paste after short delay
-    el.addEventListener("paste",  () => scheduleAutoMask(fieldId));
-    // Also auto-mask if user types a lot of content
-    el.addEventListener("input",  () => {
-      if (el.value.length > 100) scheduleAutoMask(fieldId);
+    // Auto-mask immediately on paste if content is substantive (> 20 chars)
+    el.addEventListener("paste", () => {
+      // Small delay to let the browser populate the value
+      setTimeout(() => {
+        if (el.value.length > 20) maskField(fieldId);
+      }, 10);
+    });
+
+    // Also auto-mask when user leaves the field if it has content
+    el.addEventListener("blur", () => {
+      if (el.value.length > 20) maskField(fieldId);
     });
 
     // Wire the toggle button (lock icon beside each textarea)
@@ -200,18 +268,38 @@ document.addEventListener("DOMContentLoaded", () => {
 //  INPUT TAB SWITCHING
 // ═══════════════════════════════════════════════════
 function switchInputTab(targetTab) {
+  console.log(`[PhishGuard] Switching input tab to: ${targetTab}`);
+
   // Update tab button states
-  document.querySelectorAll(".tab[data-tab]").forEach(t => {
-    t.classList.toggle("active", t.dataset.tab === targetTab);
-    t.setAttribute("aria-selected", (t.dataset.tab === targetTab).toString());
+  document.querySelectorAll(".tab[data-tab]").forEach(btn => {
+    const isActive = btn.dataset.tab === targetTab;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive.toString());
   });
 
   // Show/hide tab panels
-  document.querySelectorAll(".tab-content[id^='panel-']").forEach(panel => {
-    const isTarget = panel.id === `panel-${targetTab}`;
-    panel.classList.toggle("active", isTarget);
-    panel.hidden = !isTarget;   // Also set hidden attribute for accessibility
-  });
+  const panelFields = document.getElementById("panel-fields");
+  const panelRaw    = document.getElementById("panel-raw");
+
+  if (targetTab === "raw") {
+    if (panelFields) {
+      panelFields.hidden = true;
+      panelFields.classList.remove("active");
+    }
+    if (panelRaw) {
+      panelRaw.hidden = false;
+      panelRaw.classList.add("active");
+    }
+  } else {
+    if (panelFields) {
+      panelFields.hidden = false;
+      panelFields.classList.add("active");
+    }
+    if (panelRaw) {
+      panelRaw.hidden = true;
+      panelRaw.classList.remove("active");
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -251,16 +339,21 @@ async function runAnalysis() {
         recipient:  b64Encode(document.getElementById("inputRecipient")?.value || ""),
         subject:    b64Encode(document.getElementById("inputSubject")?.value   || ""),
         body_text:  b64Encode(getRealValue("inputBody")),
-        body_html:  b64Encode(getRealValue("inputHtml")),
-        headers:    b64Encode(getRealValue("inputHeaders")),
         language:   lang,
       };
 
-  // Require at least some actual email content (exclude meta fields)
-  const CONTENT_KEYS = ["raw_email","body_text","body_html","subject","sender"];
-  const hasContent = CONTENT_KEYS.some(k => payload[k] && payload[k].length > 0);
-  if (!hasContent) {
-    showToast("Please enter some email content to analyse.", "error");
+  // ── Validation ──
+  const mainContent = isRawMode ? getRealValue("inputRaw") : getRealValue("inputBody");
+
+  if (!mainContent || mainContent.trim().length === 0) {
+    showToast("Please enter email content to analyse. The field is empty.", "error");
+    return;
+  }
+
+  // Improved validation: detect if content "looks" like an email vs random gibberish
+  const validation = validateEmailContent(mainContent, isRawMode);
+  if (!validation.isValid) {
+    showToast(validation.message, "error");
     return;
   }
 

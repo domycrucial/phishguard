@@ -16,7 +16,7 @@ const TRANSLATIONS = {
 
     // Hero
     hero_title:    "Detect Phishing Emails Instantly",
-    hero_subtitle: "Paste any email content below — our AI-powered rule engine analyses 30+ threat indicators in under 2 seconds.",
+    hero_subtitle: "Paste any email content below — our Rule Powered Engine analyses 30+ threat indicators in under 2 seconds.",
     stat_analysed:  "analysed",
     stat_phishing:  "phishing",
     stat_suspicious:"suspicious",
@@ -97,7 +97,7 @@ const TRANSLATIONS = {
 
     // Hero
     hero_title:    "Gundua Barua Pepe za Udanganyifu Papo Hapo",
-    hero_subtitle: "Bandika maudhui ya barua pepe hapa chini — injini yetu ya sheria inachunguza dalili 30+ za vitisho kwa chini ya sekunde 2.",
+    hero_subtitle: "Bandika maudhui ya barua pepe hapa chini — Injini inayotumia Sheria (Rule Powered Engine) inachunguza dalili 30+ za vitisho kwa chini ya sekunde 2.",
     stat_analysed:  "zimechambuliwa",
     stat_phishing:  "udanganyifu",
     stat_suspicious:"inashuku",
@@ -190,7 +190,7 @@ function applyTranslations() {
   });
 
   // Update lang switcher button states
-  document.querySelectorAll(".lang-btn").forEach(btn => {
+  document.querySelectorAll(".topbar-lang-btn, .sidebar-lang-btn").forEach(btn => {
     const isActive = btn.dataset.lang === currentLang;
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-pressed", isActive.toString());
@@ -222,7 +222,7 @@ function setLanguage(lang) {
 }
 
 // Wire up language switcher buttons
-document.querySelectorAll(".lang-btn").forEach(btn => {
+document.querySelectorAll(".topbar-lang-btn, .sidebar-lang-btn").forEach(btn => {
   btn.addEventListener("click", () => setLanguage(btn.dataset.lang));
 });
 
