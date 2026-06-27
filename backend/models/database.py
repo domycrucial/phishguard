@@ -39,7 +39,7 @@ class AnalysisResult(db.Model):
     email_id         = Column(Integer, ForeignKey("emails.id"), nullable=False, index=True)
     risk_score       = Column(Float,   nullable=False)
     classification   = Column(
-        Enum("legitimate", "phishing", name="classification_enum"),
+        Enum("legitimate", "suspicious", "phishing", name="classification_enum"),
         nullable=False
     )
     confidence       = Column(Float,   nullable=False, default=0.0)

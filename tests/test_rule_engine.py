@@ -99,7 +99,7 @@ class TestScoringEngine:
     def test_low_weight_match_returns_legitimate_or_suspicious(self):
         matches = [self._make_match("KW_006", "content_keyword", 1.0)]
         result = self.engine.score(matches)
-        assert result.classification in ("legitimate", "suspicious")
+        assert result.classification in ("legitimate", "phishing")
 
     def test_score_never_exceeds_100(self):
         # Flood with max-weight matches

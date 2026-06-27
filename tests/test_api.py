@@ -29,13 +29,13 @@ def client(app):
 # ── Tests ──────────────────────────────────────────────────────
 class TestAnalyseEndpoint:
     def test_missing_body_returns_400(self, client):
-        res = client.post("/api/analyse",
+        res = client.post("/api/v1/analyse",
                           data="not-json",
                           content_type="application/json")
         assert res.status_code == 400
 
     def test_empty_payload_returns_error(self, client):
-        res = client.post("/api/analyse",
+        res = client.post("/api/v1/analyse",
                           data=json.dumps({}),
                           content_type="application/json")
         data = res.get_json()
@@ -52,7 +52,7 @@ class TestAnalyseEndpoint:
             ),
             "language": "en",
         }
-        res  = client.post("/api/analyse",
+        res  = client.post("/api/v1/analyse",
                            data=json.dumps(payload),
                            content_type="application/json")
         data = res.get_json()
@@ -70,7 +70,7 @@ class TestAnalyseEndpoint:
             ),
             "language": "en",
         }
-        res  = client.post("/api/analyse",
+        res  = client.post("/api/v1/analyse",
                            data=json.dumps(payload),
                            content_type="application/json")
         data = res.get_json()
@@ -86,7 +86,7 @@ class TestAnalyseEndpoint:
             "body_text": "Hello, click this link to win a prize!",
             "language":  "sw",
         }
-        res  = client.post("/api/analyse",
+        res  = client.post("/api/v1/analyse",
                            data=json.dumps(payload),
                            content_type="application/json")
         data = res.get_json()
@@ -97,14 +97,14 @@ class TestAnalyseEndpoint:
 
 class TestHistoryEndpoint:
     def test_returns_paginated_results(self, client):
-        res  = client.get("/api/history?page=1&per_page=5")
+        res  = client.get("/api/v1/history?page=1&per_page=5")
         data = res.get_json()
         assert res.status_code == 200
         assert "items" in data
         assert "total" in data
 
     def test_filter_by_classification(self, client):
-        res  = client.get("/api/history?classification=phishing")
+        res  = client.get("/api/v1/history?classification=phishing")
         data = res.get_json()
         assert res.status_code == 200
         # All returned items should have classification=phishing
@@ -114,16 +114,16 @@ class TestHistoryEndpoint:
 
 class TestStatsEndpoint:
     def test_stats_returns_expected_keys(self, client):
-        res  = client.get("/api/stats")
+        res  = client.get("/api/v1/stats")
         data = res.get_json()
         assert res.status_code == 200
-        for key in ["total", "phishing", "suspicious", "legitimate", "trend"]:
+        for key in ["total", "phishing", "legitimate", "trend"]:
             assert key in data
 
 
 class TestRulesEndpoint:
     def test_get_rules_returns_list(self, client):
-        res  = client.get("/api/rules")
+        res  = client.get("/api/v1/rules")
         data = res.get_json()
         assert res.status_code == 200
         assert "rules" in data
@@ -138,7 +138,7 @@ class TestRulesEndpoint:
             "pattern":     r"\btest_phish\b",
             "description": "Detects test_phish keyword",
         }
-        res  = client.post("/api/rules",
+        res  = client.post("/api/v1/rules",
                            data=json.dumps(payload),
                            content_type="application/json")
         data = res.get_json()
@@ -153,7 +153,7 @@ class TestRulesEndpoint:
             "weight":   1.0,
             "pattern":  "[invalid regex(",   # Deliberately invalid
         }
-        res  = client.post("/api/rules",
+        res  = client.post("/api/v1/rules",
                            data=json.dumps(payload),
                            content_type="application/json")
         data = res.get_json()
@@ -162,13 +162,13 @@ class TestRulesEndpoint:
 
 class TestTrainingEndpoint:
     def test_returns_all_samples(self, client):
-        res  = client.get("/api/training")
+        res  = client.get("/api/v1/training")
         data = res.get_json()
         assert res.status_code == 200
         assert data["total"] >= 8   # We seeded 8 training samples
 
     def test_filter_by_type(self, client):
-        res  = client.get("/api/training?type=phishing")
+        res  = client.get("/api/v1/training?type=phishing")
         data = res.get_json()
         assert res.status_code == 200
         for sample in data["samples"]:

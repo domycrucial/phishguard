@@ -230,7 +230,7 @@ class TestAPI:
 
     def test_analyse_empty_body_returns_error(self, client):
         import json
-        res = client.post("/api/analyse",
+        res = client.post("/api/v1/analyse",
             data=json.dumps({}), content_type="application/json")
         data = res.get_json()
         assert data["success"] is False
@@ -247,7 +247,7 @@ class TestAPI:
             ),
             "language": "en",
         }
-        res  = client.post("/api/analyse",
+        res  = client.post("/api/v1/analyse",
             data=json.dumps(payload), content_type="application/json")
         data = res.get_json()
         assert res.status_code == 200
@@ -271,7 +271,7 @@ class TestAPI:
             "headers": "DKIM-Signature: v=1; a=rsa-sha256; d=udsm.ac.tz\nReceived-SPF: pass",
             "language": "en",
         }
-        res  = client.post("/api/analyse",
+        res  = client.post("/api/v1/analyse",
             data=json.dumps(payload), content_type="application/json")
         data = res.get_json()
         assert res.status_code == 200
@@ -280,13 +280,13 @@ class TestAPI:
             f"False positive! UDSM email scored {data['risk_score']} = {data['classification']}"
 
     def test_rules_endpoint_returns_list(self, client):
-        res = client.get("/api/rules")
+        res = client.get("/api/v1/rules")
         data = res.get_json()
         assert res.status_code == 200
         assert len(data["rules"]) >= 20
 
     def test_training_endpoint_returns_samples(self, client):
-        res = client.get("/api/training")
+        res = client.get("/api/v1/training")
         data = res.get_json()
         assert res.status_code == 200
         assert data["total"] >= 8
