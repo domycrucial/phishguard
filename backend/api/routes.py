@@ -37,10 +37,11 @@ from flask_limiter.util import get_remote_address
 
 # Internal imports
 from backend.engine.analysis_pipeline   import AnalysisPipeline
-from backend.models.database            import db, Rule, AnalysisResult, Email, TriggeredRule, UserFeedback
+from backend.models.database            import db, Rule, AnalysisResult, Email, TriggeredRule, UserFeedback, BlockedIndicator, RemediationAction
 from backend.utils.sanitiser            import sanitise_input, validate_rule_input
 from backend.utils.pdf_exporter         import generate_pdf_report
 from backend.utils.training_data        import TRAINING_EMAILS
+
 
 logger = logging.getLogger(__name__)   # Module-scoped logger
 
@@ -286,8 +287,8 @@ def stats():
     ]
 
     # --- Daily trend for the last 14 days ---
-    from datetime import datetime, timedelta
-    today      = datetime.utcnow().date()
+    from datetime import datetime, timedelta, timezone
+    today      = datetime.now(timezone.utc).date()
     trend_data = []
     for i in range(13, -1, -1):   # 14 days, oldest first
         day = today - timedelta(days=i)
@@ -480,7 +481,7 @@ def export_pdf(analysis_id: int):
         )
     except Exception as exc:
         logger.error(f"[API] PDF generation failed for analysis {analysis_id}: {exc}")
-        return error_response("PDF generation failed. Please ensure WeasyPrint is installed.", 500)
+        return error_response(f"PDF generation failed: {str(exc)}", 500)
 
 
 # ══════════════════════════════════════════════════════════
@@ -551,3 +552,120 @@ def get_training_emails():
         "samples": samples,
         "total":   len(samples),
     })
+
+
+# ══════════════════════════════════════════════════════════
+#  POST /api/v1/remediate  — Quarantine or Blacklist Email/Sender/URLs
+# ══════════════════════════════════════════════════════════
+@api_blueprint.route("/remediate", methods=["POST"])
+def remediate_email():
+    """
+    Perform local, self-contained remediation operations on a parsed/analyzed email.
+    Payload keys:
+      - analysis_id: ID of the AnalysisResult table row
+      - action: "quarantine" | "block_sender" | "block_urls"
+    """
+    data = request.get_json(silent=True) or {}
+    analysis_id = data.get("analysis_id")
+    action = data.get("action")
+
+    if not analysis_id or not action:
+        return error_response("Fields 'analysis_id' and 'action' are required.")
+
+    # Fetch AnalysisResult
+    analysis = db.session.get(AnalysisResult, analysis_id)
+    if not analysis:
+        return error_response(f"Analysis result #{analysis_id} not found.", 404)
+
+    email_id = analysis.email_id
+    email_record = db.session.get(Email, email_id)
+    if not email_record:
+        return error_response(f"Email record #{email_id} not found.", 404)
+
+
+    success = False
+    notes = ""
+    try:
+        if action == "quarantine":
+            email_record.status = "quarantined"
+            db.session.commit()
+            success = True
+            notes = "Email status changed to quarantined locally."
+
+        elif action == "block_sender":
+            if not email_record.sender:
+                return error_response("Email has no sender information to blacklist.")
+            
+            sender_email = email_record.sender.strip()
+            import re
+            email_match = re.search(r'<([^>]+)>', sender_email)
+            if email_match:
+                sender_email = email_match.group(1).strip()
+
+            existing_ind = BlockedIndicator.query.filter_by(value=sender_email).first()
+            if not existing_ind:
+                indicator = BlockedIndicator(indicator_type="sender", value=sender_email)
+                db.session.add(indicator)
+            
+            success = True
+            notes = f"Sender {sender_email} added to local blacklist."
+
+        elif action == "block_urls":
+            import re
+            from urllib.parse import urlparse
+            body = email_record.body_text or ""
+            urls = re.findall(r'https?://[^\s>]+', body)
+            
+            blocked_count = 0
+            for url in set(urls):
+                try:
+                    domain = urlparse(url).netloc
+                    if not domain:
+                        continue
+                    domain = domain.lower()
+                    existing_ind = BlockedIndicator.query.filter_by(value=domain).first()
+                    if not existing_ind:
+                        indicator = BlockedIndicator(indicator_type="domain", value=domain)
+                        db.session.add(indicator)
+                        blocked_count += 1
+                except Exception:
+                    pass
+            
+            success = True
+            notes = f"Blacklisted {blocked_count} URL domains extracted from email."
+
+        else:
+            return error_response(f"Unknown remediation action '{action}'.")
+
+        # Log remediation action in remediation_logs
+        log = RemediationAction(
+            email_id=email_id,
+            action_type=action,
+            status="success" if success else "failed",
+            notes=notes
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": f"Remediation action '{action}' completed successfully.",
+            "notes": notes
+        })
+
+    except Exception as exc:
+        db.session.rollback()
+        logger.error(f"[Remediation] Failed to execute {action} on email #{email_id}: {exc}")
+        try:
+            fail_log = RemediationAction(
+                email_id=email_id,
+                action_type=action,
+                status="failed",
+                notes=str(exc)
+            )
+            db.session.add(fail_log)
+            db.session.commit()
+        except Exception:
+            pass
+        return error_response(f"Remediation action failed: {str(exc)}", 500)
+
