@@ -20,6 +20,8 @@ lxml==5.2.2                   # Fast XML/HTML parser (BS4 backend)
 
 # ── PDF Export ───────────────────────────────────────────────
 weasyprint==62.3              # HTML → PDF renderer using Cairo/Pango
+fpdf2==2.8.7                  # Fallback PDF generator with zero C dependencies
+
 
 # ── Security & Input Handling ────────────────────────────────
 bleach==6.1.0                 # HTML sanitisation (defence in depth)
