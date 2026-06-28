@@ -239,6 +239,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("feedbackCorrectBtn")?.addEventListener("click", () => submitFeedback(true));
   document.getElementById("feedbackWrongBtn")?.addEventListener("click",   () => submitFeedback(false));
 
+  // Remediation buttons
+  document.getElementById("remediateQuarantineBtn")?.addEventListener("click", () => executeRemediation("quarantine"));
+  document.getElementById("remediateBlockSenderBtn")?.addEventListener("click", () => executeRemediation("block_sender"));
+  document.getElementById("remediateBlockUrlsBtn")?.addEventListener("click", () => executeRemediation("block_urls"));
+
+
   // ── Content Masking: auto-mask 1.5s after paste/type ──────────────────
   // Each maskable field also has a toggle button (#mask-<fieldId>)
   MASKABLE_FIELDS.forEach(fieldId => {
@@ -473,7 +479,13 @@ function renderResults(data) {
   // ── 6. Email Info Tab ──
   renderEmailInfo(data);
 
-  // ── 7. Show results section with animation ──
+  // ── 7. Toggle local remediation panel based on verdict ──
+  const remediationPanel = document.getElementById("remediationPanel");
+  if (remediationPanel) {
+    remediationPanel.hidden = (clf !== "phishing");
+  }
+
+  // ── 8. Show results section with animation ──
   resultsSection.hidden = false;
   resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -708,6 +720,21 @@ function clearForm() {
   progressWrap.hidden   = true;
   currentAnalysisId     = null;
 
+  // Reset remediation panel and buttons
+  const remPanel = document.getElementById("remediationPanel");
+  if (remPanel) remPanel.hidden = true;
+
+  const resetBtn = (id, html) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.removeAttribute("disabled");
+      btn.innerHTML = html;
+    }
+  };
+  resetBtn("remediateQuarantineBtn", `<i class="ti ti-box"></i>Quarantine Record`);
+  resetBtn("remediateBlockSenderBtn", `<i class="ti ti-user-off"></i>Blacklist Sender`);
+  resetBtn("remediateBlockUrlsBtn", `<i class="ti ti-link-off"></i>Blacklist Link Domains`);
+
   // Scroll back to input
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -757,6 +784,49 @@ async function submitFeedback(isCorrect) {
     showToast("Could not submit feedback.", "error");
   }
 }
+
+// ═══════════════════════════════════════════════════
+//  REMEDIATION EXECUTION
+// ═══════════════════════════════════════════════════
+async function executeRemediation(action) {
+  if (!currentAnalysisId) {
+    showToast("No analysis available for remediation.", "error");
+    return;
+  }
+
+  showToast("Executing remediation action...", "info");
+
+  try {
+    const res = await fetch("/api/v1/remediate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        analysis_id: currentAnalysisId,
+        action: action
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || "Remediation action completed.", "success");
+      
+      let btnId = "";
+      if (action === "quarantine") btnId = "remediateQuarantineBtn";
+      else if (action === "block_sender") btnId = "remediateBlockSenderBtn";
+      else if (action === "block_urls") btnId = "remediateBlockUrlsBtn";
+
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.setAttribute("disabled", "true");
+        btn.innerHTML = `<i class="ti ti-check"></i> Applied`;
+      }
+    } else {
+      showToast(data.error || "Action failed.", "error");
+    }
+  } catch (err) {
+    showToast("Remediation execution failed.", "error");
+  }
+}
+
 
 // ═══════════════════════════════════════════════════
 //  HERO STATS LOADER
