@@ -14,17 +14,25 @@ import os          # File path handling
 import logging
 from pathlib import Path
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)   # Module-scoped logger
 
-# --- WeasyPrint import (graceful fallback if not installed) ---
+# --- WeasyPrint import (graceful fallback if not installed/configured) ---
 try:
     from weasyprint import HTML as WeasyHTML   # WeasyPrint HTML → PDF renderer
     WEASYPRINT_AVAILABLE = True
-except ImportError:
+except Exception as exc:
     WEASYPRINT_AVAILABLE = False
-    logger.warning("[PDFExporter] WeasyPrint not installed. PDF export disabled.")
+    logger.warning(f"[PDFExporter] WeasyPrint could not be imported ({type(exc).__name__}: {exc}). falling back to fpdf2.")
+
+# --- FPDF2 import (graceful fallback if not installed/configured) ---
+try:
+    from fpdf import FPDF
+    FPDF_AVAILABLE = True
+except Exception as exc:
+    FPDF_AVAILABLE = False
+    logger.warning(f"[PDFExporter] fpdf2 could not be imported ({type(exc).__name__}: {exc}). PDF export fallback disabled.")
 
 
 def generate_pdf_report(report_data: Dict[str, Any], analysis_id: int, language: str = "en") -> Path:
@@ -38,29 +46,282 @@ def generate_pdf_report(report_data: Dict[str, Any], analysis_id: int, language:
 
     Returns:
         Path to the generated PDF file.
-
-    Raises:
-        RuntimeError if WeasyPrint is not installed.
-        Exception on WeasyPrint rendering failure.
     """
-    if not WEASYPRINT_AVAILABLE:
+    if WEASYPRINT_AVAILABLE:
+        try:
+            # --- Build the HTML content for the report ---
+            html_content = _build_report_html(report_data, language)
+
+            # --- Determine output path ---
+            from flask import current_app
+            output_dir = current_app.config.get("PDF_OUTPUT_DIR", Path("exports"))
+            output_path = Path(output_dir) / f"phishguard_report_{analysis_id}.pdf"
+
+            # --- Render HTML to PDF using WeasyPrint ---
+            WeasyHTML(string=html_content).write_pdf(str(output_path))
+            logger.info(f"[PDFExporter] PDF generated via WeasyPrint: {output_path}")
+            return output_path
+        except Exception as exc:
+            logger.warning(f"[PDFExporter] WeasyPrint generation failed at runtime: {exc}. Trying fpdf2 fallback.")
+
+    if FPDF_AVAILABLE:
+        logger.info(f"[PDFExporter] Using fpdf2 fallback driver for analysis #{analysis_id}")
+        return _generate_pdf_fallback_fpdf(report_data, analysis_id, language)
+    else:
         raise RuntimeError(
-            "WeasyPrint is not installed. Run: pip install weasyprint --break-system-packages"
+            "Neither WeasyPrint nor fpdf2 are available. Unable to generate PDF."
         )
 
-    # --- Build the HTML content for the report ---
-    html_content = _build_report_html(report_data, language)
 
-    # --- Determine output path ---
+
+def clean_pdf_text(text: str) -> str:
+    """
+    Sanitise text for FPDF2 standard font usage (Helvetica).
+    Replaces common emojis/Unicode symbols and strips characters that cannot be encoded in Latin-1.
+    """
+    if not text:
+        return ""
+    # Map common emojis/symbols to plain text equivalents
+    mappings = {
+        "⚠️": "WARNING: ",
+        "⚠": "WARNING: ",
+        "✓": "OK",
+        "✔": "OK",
+        "✗": "FAIL",
+        "✘": "FAIL",
+        "–": "-",  # en-dash
+        "—": "-",  # em-dash
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+    }
+    for k, v in mappings.items():
+        text = text.replace(k, v)
+
+    # Filter out any other characters outside the Latin-1 range
+    cleaned = []
+    for char in text:
+        try:
+            char.encode('latin-1')
+            cleaned.append(char)
+        except UnicodeEncodeError:
+            # Skip unrenderable character
+            pass
+    return "".join(cleaned)
+
+
+def _generate_pdf_fallback_fpdf(data: Dict[str, Any], analysis_id: int, language: str) -> Path:
+    """
+    Generate a PDF report using fpdf2, completely bypassing HTML rendering engines.
+    """
     from flask import current_app
+
+    # Load labels
+    labels = {
+        "en": {
+            "title":         "PhishGuard Analysis Report",
+            "generated":     "Generated",
+            "email_info":    "Email Information",
+            "sender":        "Sender",
+            "subject":       "Subject",
+            "analysed_at":   "Analysed At",
+            "risk_score":    "Risk Score",
+            "classification":"Classification",
+            "confidence":    "Confidence",
+            "processing":    "Processing Time",
+            "triggered":     "Triggered Rules",
+            "category":      "Category Breakdown",
+            "no_rules":      "No rules were triggered.",
+            "risk_level":    "Risk Level",
+            "ms":            "ms",
+        },
+        "sw": {
+            "title":         "Ripoti ya Uchambuzi wa PhishGuard",
+            "generated":     "Imetolewa",
+            "email_info":    "Taarifa za Barua Pepe",
+            "sender":        "Mtumaji",
+            "subject":       "Kichwa cha Habari",
+            "analysed_at":   "Imechambuliwa Saa",
+            "risk_score":    "Alama ya Hatari",
+            "classification":"Uainishaji",
+            "confidence":    "Uhakika",
+            "processing":    "Muda wa Uchakataji",
+            "triggered":     "Sheria Zilizoanzishwa",
+            "category":      "Mgawanyo wa Kategoria",
+            "no_rules":      "Hakuna sheria zilizoanzishwa.",
+            "risk_level":    "Kiwango cha Hatari",
+            "ms":            "ms",
+        }
+    }
+    L = labels.get(language, labels["en"])
+
+    analysis        = data["analysis"]
+    email_row       = data["email"]
+    triggered_rules = data.get("triggered_rules", [])
+    category_scores = data.get("category_scores", {})
+    clf = analysis.classification
+
+    # Colors
+    color_map = {
+        "phishing":   (220, 38, 38),   # Red
+        "suspicious": (245, 158, 11),  # Amber
+        "legitimate": (22, 163, 74),   # Green
+    }
+    badge_color = color_map.get(clf, (107, 114, 128))
+
+    # Initialize FPDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Title Header Banner
+    pdf.set_fill_color(30, 41, 59) # #1e293b Dark Slate
+    pdf.rect(0, 0, 210, 35, "F")
+
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_xy(15, 8)
+    pdf.cell(0, 10, L["title"], ln=True)
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(148, 163, 184) # light grey
+    pdf.set_x(15)
+    pdf.cell(0, 5, f"{L['generated']}: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}", ln=True)
+
+    # Content body styling
+    pdf.set_text_color(31, 41, 55) # dark grey
+    pdf.set_xy(15, 42)
+
+    # Verdict boxes
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(60, 5, L["risk_score"].upper(), ln=False)
+    pdf.cell(60, 5, L["confidence"].upper(), ln=False)
+    pdf.cell(60, 5, L["processing"].upper(), ln=True)
+
+    pdf.set_font("Helvetica", "B", 24)
+    # Set text color based on classification
+    pdf.set_text_color(*badge_color)
+    pdf.cell(60, 10, f"{analysis.risk_score:.0f} / 100", ln=False)
+    pdf.cell(60, 10, f"{int(analysis.confidence * 100)}%", ln=False)
+    pdf.cell(60, 10, f"{analysis.processing_time:.0f} {L['ms']}", ln=True)
+
+    pdf.ln(4)
+    # Classification Badge
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(31, 41, 55)
+    pdf.cell(35, 8, f"{L['classification']}: ", ln=False)
+    pdf.set_text_color(255, 255, 255)
+    
+    # Draw colored rectangle for classification badge
+    x, y = pdf.get_x(), pdf.get_y()
+    pdf.set_fill_color(*badge_color)
+    # Measure width
+    text_w = pdf.get_string_width(clf.upper()) + 6
+    pdf.rect(x, y + 1, text_w, 6, "F")
+    pdf.set_xy(x + 3, y)
+    pdf.cell(text_w, 8, clf.upper(), ln=True)
+
+    pdf.ln(3)
+    # Explanation Narrative block
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(75, 85, 99)
+    pdf.multi_cell(0, 5, clean_pdf_text(analysis.explanation or ""))
+    pdf.ln(5)
+
+    # Email Info Section
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(55, 65, 81)
+    pdf.cell(0, 8, L["email_info"], border="B", ln=True)
+    pdf.ln(2)
+
+    pdf.set_font("Helvetica", "", 10)
+    # Draw email metadata grid
+    pdf.set_fill_color(249, 250, 251)
+
+    # Sender Row
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(40, 7, L["sender"], border=1, fill=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 7, clean_pdf_text(email_row.sender or "N/A"), border=1, ln=True)
+
+    # Subject Row
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(40, 7, L["subject"], border=1, fill=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 7, clean_pdf_text(email_row.subject or "N/A"), border=1, ln=True)
+
+    # Analysed At Row
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(40, 7, L["analysed_at"], border=1, fill=True)
+    pdf.set_font("Helvetica", "", 10)
+    analysed_str = analysis.analysed_at.strftime('%Y-%m-%d %H:%M UTC') if analysis.analysed_at else 'N/A'
+    pdf.cell(0, 7, analysed_str, border=1, ln=True)
+    pdf.ln(5)
+
+    # Triggered Rules Section
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, f"{L['triggered']} ({len(triggered_rules)})", border="B", ln=True)
+    pdf.ln(2)
+
+    # Rules Table headers
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(249, 250, 251)
+    pdf.cell(20, 7, "ID", border=1, fill=True)
+    pdf.cell(55, 7, "Name", border=1, fill=True)
+    pdf.cell(45, 7, "Category", border=1, fill=True)
+    pdf.cell(15, 7, "Weight", border=1, fill=True, align="C")
+    pdf.cell(45, 7, "Evidence", border=1, fill=True, ln=True)
+
+    pdf.set_font("Helvetica", "", 8)
+    if triggered_rules:
+        for tr, rule in triggered_rules:
+            # We want to support multi-line wrap for long rule names or evidence
+            name_truncated = rule.name[:32] + "..." if len(rule.name) > 35 else rule.name
+            pdf.cell(20, 7, clean_pdf_text(str(rule.rule_id)), border=1)
+            pdf.cell(55, 7, clean_pdf_text(name_truncated), border=1)
+            pdf.cell(45, 7, clean_pdf_text(str(rule.category)), border=1)
+            pdf.cell(15, 7, f"{rule.weight:.1f}", border=1, align="C")
+            
+            evidence_truncated = (tr.evidence[:25] + "...") if tr.evidence and len(tr.evidence) > 28 else (tr.evidence or "-")
+            pdf.cell(45, 7, clean_pdf_text(evidence_truncated), border=1, ln=True)
+    else:
+        pdf.cell(0, 10, L["no_rules"], border=1, align="C", ln=True)
+    pdf.ln(5)
+
+    # Category Breakdown Section
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, L["category"], border="B", ln=True)
+    pdf.ln(2)
+
+    pdf.set_font("Helvetica", "", 10)
+    for cat, score in sorted(category_scores.items(), key=lambda x: x[1], reverse=True):
+        cat_title = cat.replace('_', ' ').title()
+        pdf.cell(50, 6, cat_title, border=0)
+
+        # Simple text representation of progress bar
+        bar_len = int(min(20, score / 5))
+        bar_str = "[" + "=" * bar_len + " " * (20 - bar_len) + "]"
+        pdf.set_font("Courier", "", 10)
+        pdf.cell(60, 6, bar_str, border=0)
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(20, 6, f"{score:.1f}", border=0, ln=True)
+
+    pdf.ln(10)
+    # Footer
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(156, 163, 175)
+    pdf.cell(0, 10, f"PhishGuard 2026  Analysis ID #{analysis.id}  Phishing Email Detection System", align="C")
+
+    # Output file
     output_dir = current_app.config.get("PDF_OUTPUT_DIR", Path("exports"))
     output_path = Path(output_dir) / f"phishguard_report_{analysis_id}.pdf"
-
-    # --- Render HTML to PDF using WeasyPrint ---
-    WeasyHTML(string=html_content).write_pdf(str(output_path))
-    logger.info(f"[PDFExporter] PDF generated: {output_path}")
+    pdf.output(name=str(output_path))
 
     return output_path
+
 
 
 def _build_report_html(data: Dict[str, Any], language: str) -> str:
@@ -190,7 +451,7 @@ def _build_report_html(data: Dict[str, Any], language: str) -> str:
   <!-- HEADER -->
   <div class="header">
     <h1>🛡 {L['title']}</h1>
-    <p>{L['generated']}: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+    <p>{L['generated']}: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</p>
   </div>
 
   <!-- VERDICT -->
