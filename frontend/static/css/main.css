@@ -200,6 +200,9 @@ a:hover{text-decoration:underline}
 .btn-primary{background:var(--color-brand);color:#fff;border-color:var(--color-brand);box-shadow:0 2px 8px rgba(59,130,246,0.3)}
 .btn-primary:hover{background:var(--color-brand-dk);transform:translateY(-1px);box-shadow:0 4px 14px rgba(59,130,246,0.4)}
 .btn-primary:active{transform:none}
+.btn-danger{background:var(--color-danger);color:#fff;border-color:var(--color-danger);box-shadow:0 2px 8px rgba(239,68,68,0.3)}
+.btn-danger:hover{background:#DC2626;transform:translateY(-1px);box-shadow:0 4px 14px rgba(239,68,68,0.4)}
+.btn-danger:active{transform:none}
 .btn-secondary{background:var(--bg-input);color:var(--text-secondary);border-color:var(--border)}
 .btn-secondary:hover{border-color:var(--text-muted);color:var(--text-primary)}
 .btn-outline{background:transparent;color:var(--text-secondary);border-color:var(--border)}
