@@ -14,8 +14,15 @@ import datetime
 import json
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum
+from sqlalchemy.dialects.mysql import INTEGER as mysql_INTEGER
 
 db = SQLAlchemy()
+
+
+def _get_utc_now():
+    """Return timezone-naive UTC datetime to avoid Python 3.12 deprecation warnings."""
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+
 
 
 class Email(db.Model):
@@ -27,10 +34,12 @@ class Email(db.Model):
     body_text    = Column(Text,         nullable=True)
     body_html    = Column(Text,         nullable=True)
     raw_headers  = Column(Text,         nullable=True)
-    submitted_at = Column(DateTime,     default=datetime.datetime.utcnow)
+    submitted_at = Column(DateTime,     default=_get_utc_now)
     ip_address   = Column(String(45),   nullable=True)
     language     = Column(String(10),   default="en")
+    status       = Column(String(50),   default="active")
     analysis     = db.relationship("AnalysisResult", back_populates="email", uselist=False)
+
 
 
 class AnalysisResult(db.Model):
@@ -57,7 +66,7 @@ class AnalysisResult(db.Model):
     trace_id         = Column(String(64),  nullable=True, index=True)
     # pipeline_version lets us correlate results with algorithm changes
     pipeline_version = Column(String(20),  nullable=True)
-    analysed_at      = Column(DateTime, default=datetime.datetime.utcnow)
+    analysed_at      = Column(DateTime, default=_get_utc_now)
     email            = db.relationship("Email",          back_populates="analysis")
     triggered_rules  = db.relationship("TriggeredRule",  back_populates="analysis_result",
                                        cascade="all, delete-orphan")
@@ -93,7 +102,7 @@ class Rule(db.Model):
     pattern     = Column(Text,    nullable=True)
     is_enabled  = Column(Boolean, default=True)
     is_custom   = Column(Boolean, default=False)
-    created_at  = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at  = Column(DateTime, default=_get_utc_now)
     triggers    = db.relationship("TriggeredRule", back_populates="rule")
 
 
@@ -121,11 +130,33 @@ class UserFeedback(db.Model):
         nullable=True
     )
     comment            = Column(Text, nullable=True)
-    submitted_at       = Column(DateTime, default=datetime.datetime.utcnow)
+    submitted_at       = Column(DateTime, default=_get_utc_now)
     analysis_result    = db.relationship("AnalysisResult", back_populates="feedback")
 
 
+class BlockedIndicator(db.Model):
+    __tablename__ = "blocked_indicators"
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    indicator_type = Column(String(50), nullable=False) # "domain", "sender", "url"
+    value          = Column(String(512), unique=True, nullable=False, index=True)
+    created_at     = Column(DateTime, default=_get_utc_now)
+
+
+class RemediationAction(db.Model):
+    __tablename__ = "remediation_logs"
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    email_id    = Column(mysql_INTEGER(unsigned=True), ForeignKey("emails.id"), nullable=False, index=True)
+    action_type = Column(String(50), nullable=False) # "quarantine", "block_sender", "block_urls"
+
+    status      = Column(String(20), nullable=False) # "success", "failed"
+    executed_at = Column(DateTime, default=_get_utc_now)
+    notes       = Column(Text, nullable=True)
+
+    email       = db.relationship("Email")
+
+
 def init_db():
+
     """
     Initialise the database: create tables, run column migrations, sync rules.
     Must be called inside an active Flask app context AFTER db.init_app(app).
@@ -164,6 +195,11 @@ def _run_column_migrations():
             col["name"]
             for col in inspector.get_columns("analysis_results")
         }
+        # Get existing column names in emails
+        emails_existing = {
+            col["name"]
+            for col in inspector.get_columns("emails")
+        }
     except Exception as exc:
         # Table doesn't exist yet; create_all() will handle it
         log.debug(f"[DB] Migration skipped (table absent): {exc}")
@@ -187,6 +223,10 @@ def _run_column_migrations():
         for col, ddl in REQUIRED_COLUMNS
         if col not in existing
     ]
+
+    if "status" not in emails_existing:
+        pending.append("ALTER TABLE emails ADD COLUMN status VARCHAR(50) DEFAULT 'active'")
+
 
     for ddl in pending:
         try:
