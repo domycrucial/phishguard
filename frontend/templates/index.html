@@ -237,6 +237,21 @@
         <button class="btn btn-outline" id="feedbackWrongBtn" data-correct="false"><i class="ti ti-thumb-down"></i>Incorrect</button>
         <button class="btn btn-secondary" id="newAnalysisBtn"><i class="ti ti-refresh"></i>New Analysis</button>
       </div>
+
+      <!-- REMEDIATION PANEL -->
+      <div class="card remediation-card" id="remediationPanel" style="margin-top:14px;" hidden>
+        <div class="card-header" style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px;">
+          <h3 class="card-title" style="color:var(--color-danger);font-size:15px;display:flex;align-items:center;gap:6px;"><i class="ti ti-shield-alert" style="font-size:18px;"></i><span>Remediation Operations</span></h3>
+        </div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">
+          This email was classified as phishing. Select an internal action to remediate this threat locally:
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-danger" id="remediateQuarantineBtn"><i class="ti ti-box"></i>Quarantine Record</button>
+          <button class="btn btn-outline" id="remediateBlockSenderBtn"><i class="ti ti-user-off"></i>Blacklist Sender</button>
+          <button class="btn btn-outline" id="remediateBlockUrlsBtn"><i class="ti ti-link-off"></i>Blacklist Link Domains</button>
+        </div>
+      </div>
     </section>
 
     <!-- RECENT HISTORY -->
