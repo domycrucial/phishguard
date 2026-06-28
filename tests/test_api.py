@@ -8,7 +8,7 @@ import json
 import pytest
 from app import create_app
 from backend.utils.config import TestingConfig
-from backend.models.database import db as _db
+from backend.models.database import db as _db, Email
 
 
 # ── Fixtures ──────────────────────────────────────────────────
@@ -173,3 +173,147 @@ class TestTrainingEndpoint:
         assert res.status_code == 200
         for sample in data["samples"]:
             assert sample["expected_type"] == "phishing"
+
+
+class TestRemediationEndpoint:
+    def test_remediate_quarantine(self, client, app):
+        with app.app_context():
+            from backend.models.database import AnalysisResult
+            email = Email(
+                sender="test@bad-sender.com",
+                recipient="user@internal.com",
+                subject="Test Quarantine",
+                body_text="Hello, visit http://malicious-site.com",
+                status="active"
+            )
+            _db.session.add(email)
+            _db.session.flush()
+            analysis = AnalysisResult(
+                email_id=email.id,
+                risk_score=90.0,
+                classification="phishing",
+                confidence=0.9
+            )
+            _db.session.add(analysis)
+            _db.session.commit()
+            email_id = email.id
+            analysis_id = analysis.id
+
+        # Call quarantine action
+        payload = {"analysis_id": analysis_id, "action": "quarantine"}
+        res = client.post("/api/v1/remediate",
+                          data=json.dumps(payload),
+                          content_type="application/json")
+        data = res.get_json()
+        assert res.status_code == 200
+        assert data["success"] is True
+
+        # Verify change in db
+        with app.app_context():
+            updated_email = _db.session.get(Email, email_id)
+            assert updated_email.status == "quarantined"
+
+            # Check remediation logs
+            from backend.models.database import RemediationAction
+            log = RemediationAction.query.filter_by(email_id=email_id, action_type="quarantine").first()
+            assert log is not None
+            assert log.status == "success"
+
+    def test_remediate_block_sender_and_fast_path(self, client, app):
+        with app.app_context():
+            from backend.models.database import AnalysisResult
+            email = Email(
+                sender="spammer@scammy-domain.com",
+                recipient="user@internal.com",
+                subject="Scam offer",
+                body_text="Give me money",
+                status="active"
+            )
+            _db.session.add(email)
+            _db.session.flush()
+            analysis = AnalysisResult(
+                email_id=email.id,
+                risk_score=90.0,
+                classification="phishing",
+                confidence=0.9
+            )
+            _db.session.add(analysis)
+            _db.session.commit()
+            email_id = email.id
+            analysis_id = analysis.id
+
+        # Call block_sender action
+        payload = {"analysis_id": analysis_id, "action": "block_sender"}
+        res = client.post("/api/v1/remediate",
+                          data=json.dumps(payload),
+                          content_type="application/json")
+        data = res.get_json()
+        assert res.status_code == 200
+        assert data["success"] is True
+
+        # Verify indicator added to BlockedIndicator
+        with app.app_context():
+            from backend.models.database import BlockedIndicator
+            ind = BlockedIndicator.query.filter_by(value="spammer@scammy-domain.com").first()
+            assert ind is not None
+            assert ind.indicator_type == "sender"
+
+        # Now, submit a new email from this sender via /api/v1/analyse
+        # It should trigger the fast-path check and return 100/100 risk score
+        analyse_payload = {
+            "sender": "spammer@scammy-domain.com",
+            "subject": "Hello again",
+            "body_text": "Need money urgently",
+            "language": "en"
+        }
+        res_analyse = client.post("/api/v1/analyse",
+                                  data=json.dumps(analyse_payload),
+                                  content_type="application/json")
+        data_analyse = res_analyse.get_json()
+        assert res_analyse.status_code == 200
+        assert data_analyse["success"] is True
+        assert data_analyse["risk_score"] == 100.0
+        assert data_analyse["classification"] == "phishing"
+        assert data_analyse["rules_triggered"] == 1
+        assert "spammer@scammy-domain.com" in data_analyse["triggered_rules"][0]["evidence"]
+
+    def test_remediate_block_urls(self, client, app):
+        with app.app_context():
+            from backend.models.database import AnalysisResult
+            email = Email(
+                sender="info@news.com",
+                recipient="user@internal.com",
+                subject="Check this",
+                body_text="Click here: http://phish-link.tk/verify",
+                status="active"
+            )
+            _db.session.add(email)
+            _db.session.flush()
+            analysis = AnalysisResult(
+                email_id=email.id,
+                risk_score=90.0,
+                classification="phishing",
+                confidence=0.9
+            )
+            _db.session.add(analysis)
+            _db.session.commit()
+            email_id = email.id
+            analysis_id = analysis.id
+
+        # Call block_urls action
+        payload = {"analysis_id": analysis_id, "action": "block_urls"}
+        res = client.post("/api/v1/remediate",
+                          data=json.dumps(payload),
+                          content_type="application/json")
+        data = res.get_json()
+        assert res.status_code == 200
+        assert data["success"] is True
+
+        # Verify domain added to BlockedIndicator
+        with app.app_context():
+            from backend.models.database import BlockedIndicator
+            ind = BlockedIndicator.query.filter_by(value="phish-link.tk").first()
+            assert ind is not None
+            assert ind.indicator_type == "domain"
+
+
