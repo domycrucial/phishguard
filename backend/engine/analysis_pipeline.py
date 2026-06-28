@@ -36,7 +36,7 @@ from typing import Dict, Any, Optional
 # ── Internal Engines ──────────────────────────────────────────────────────────
 from backend.engine.email_parser        import EmailParser
 from backend.engine.feature_engine      import FeatureEngine       # canonical FE
-from backend.engine.rule_engine         import RuleEngine
+from backend.engine.rule_engine         import RuleEngine, RuleMatch
 from backend.engine.correlation_engine  import CorrelationEngine
 from backend.engine.legitimacy_engine   import LegitimacyEngine
 from backend.engine.scoring_engine      import ScoringEngine
@@ -46,7 +46,8 @@ from backend.engine.explainability_engine import ExplainabilityEngine
 from backend.utils.normalizer import normalize_email_content
 
 # ── Database Models ───────────────────────────────────────────────────────────
-from backend.models.database import db, Email, AnalysisResult, TriggeredRule
+from backend.models.database import db, Email, AnalysisResult, TriggeredRule, BlockedIndicator
+
 
 # ── Custom Exceptions ─────────────────────────────────────────────────────────
 from backend.exceptions import (
@@ -150,8 +151,152 @@ class AnalysisPipeline:
             logger.warning(f"[{trace_id}] Normalization warning: {exc}")
         metrics["normalize_ms"] = self._ms(t)
 
+        # ── STAGE 2.5: Fast-Path Blocklist Check ──────────────────────────────
+        fast_path_match = False
+        fast_path_reason = ""
+        try:
+            # Check Sender
+            if parsed.sender_email:
+                sender_email = parsed.sender_email.strip().lower()
+                ind = BlockedIndicator.query.filter_by(value=sender_email).first()
+                if ind:
+                    fast_path_match = True
+                    fast_path_reason = f"Sender address '{parsed.sender_email}' matches local security blocklist."
+            
+            # Check URLs domains if sender didn't match
+            if not fast_path_match and parsed.unique_domains:
+                for domain in parsed.unique_domains:
+                    domain_lower = domain.strip().lower()
+                    ind = BlockedIndicator.query.filter_by(value=domain_lower).first()
+                    if ind:
+                        fast_path_match = True
+                        fast_path_reason = f"URL domain '{domain}' matches local security blocklist."
+                        break
+        except Exception as exc:
+            logger.warning(f"[{trace_id}] Fast-path blocklist check error: {exc}")
+
+        if fast_path_match:
+            logger.info(f"[{trace_id}] Fast-path blocklist matched: {fast_path_reason}")
+            # Build synthetic result objects
+            blacklist_rule_match = RuleMatch(
+                rule_id="BLK_001",
+                rule_db_id=9999,
+                name="Local Security Blacklist Match",
+                category="sender_verification",
+                weight=10.0,
+                evidence=fast_path_reason,
+                explanation="This email was immediately classified as phishing because the sender address or an embedded link domain matches an entry on the local blocklist.",
+                score_contribution=10.0
+            )
+            matches = [blacklist_rule_match]
+            
+            from backend.engine.correlation_engine import CorrelationResult
+            correlation = CorrelationResult(composite_bonus=0.0, triggered_composites=[])
+            
+            from backend.engine.legitimacy_engine import LegitimacyResult
+            legitimacy = LegitimacyResult(legitimacy_deduction=0.0, deduction_reasons=[])
+            
+            from backend.engine.scoring_engine import ScoringResult
+            scoring = ScoringResult(
+                risk_score=100.0,
+                classification="phishing",
+                confidence=1.0,
+                raw_score=100.0,
+                composite_bonus=0.0,
+                legitimacy_deduction=0.0,
+                adjusted_score=100.0,
+                category_scores={"sender_verification": 100.0},
+                rule_matches=matches
+            )
+            
+            # Set stage metrics to 0
+            metrics["feature_ms"] = 0.0
+            metrics["rules_ms"] = 0.0
+            metrics["correlation_ms"] = 0.0
+            metrics["legitimacy_ms"] = 0.0
+            metrics["scoring_ms"] = 0.0
+            
+            # Jump directly to explainability
+            t_exp = time.perf_counter()
+            try:
+                explanation = self.explainer.explain(
+                    scoring_result = scoring,
+                    language       = language,
+                )
+            except Exception as exc:
+                logger.error(f"[{trace_id}] Explainability failed: {exc}")
+                return self._error("Explanation generation failed.", trace_id)
+            metrics["explainability_ms"] = self._ms(t_exp)
+            
+            processing_ms = self._ms(pipeline_start)
+            
+            t_pers = time.perf_counter()
+            analysis_id = None
+            try:
+                analysis_id = self._persist(
+                    parsed         = parsed,
+                    scoring        = scoring,
+                    explanation    = explanation,
+                    feature_set    = None,
+                    processing_ms  = processing_ms,
+                    ip_address     = ip_address,
+                    language       = language,
+                    sender_in      = sender,
+                    recipient_in   = recipient,
+                    subject_in     = subject,
+                    body_text_in   = body_text,
+                    body_html_in   = body_html,
+                    trace_id       = trace_id,
+                )
+            except Exception as exc:
+                logger.error(f"[{trace_id}] Persistence failed: {exc}")
+            metrics["persist_ms"] = self._ms(t_pers)
+            
+            logger.info(
+                "[Pipeline] trace=%s ver=%s score=%.1f class=%s conf=%.2f rules=%d ms=%.1f",
+                trace_id, self.PIPELINE_VERSION,
+                scoring.risk_score, scoring.classification,
+                scoring.confidence, len(matches), processing_ms,
+            )
+            
+            return {
+                "success":            True,
+                "trace_id":           trace_id,
+                "analysis_id":        analysis_id,
+                "pipeline_version":   self.PIPELINE_VERSION,
+                "risk_score":         scoring.risk_score,
+                "classification":     scoring.classification,
+                "confidence":         scoring.confidence,
+                "processing_ms":      processing_ms,
+                "performance_metrics": metrics,
+                "rules_triggered":    len(matches),
+                "triggered_rules": [
+                    {
+                        "rule_name": m.rule_name,
+                        "severity":  m.severity,
+                        "score":     m.score_contribution,
+                        "evidence":  m.evidence,
+                    }
+                    for m in matches
+                ],
+                "composite_patterns":   correlation.triggered_composites,
+                "legitimacy_signals":   legitimacy.deduction_reasons,
+                "legitimacy_deduction": legitimacy.legitimacy_deduction,
+                "composite_bonus":      correlation.composite_bonus,
+                "category_scores":      scoring.category_scores,
+                "email_summary": {
+                    "sender":           parsed.sender_email or sender,
+                    "subject":          parsed.subject or subject,
+                    "has_html":         bool(parsed.body_html),
+                    "url_count":        parsed.url_count,
+                    "attachment_count": len(parsed.attachment_names),
+                },
+                "explanation": explanation,
+            }
+
         # ── STAGE 3: Feature Extraction ───────────────────────────────────────
         t = time.perf_counter()
+
         try:
             feature_set = self.features.extract(parsed)
         except FeatureExtractionError as exc:
