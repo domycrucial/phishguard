@@ -47,6 +47,7 @@
     <li><a href="/dashboard" class="sidebar-link active"><i class="ti ti-chart-bar"></i><span>Dashboard</span></a></li>
     <li><a href="/training" class="sidebar-link"><i class="ti ti-school"></i><span>Training</span></a></li>
     <li><a href="/rules" class="sidebar-link"><i class="ti ti-adjustments"></i><span>Rules</span></a></li>
+    <li><a href="/trusted-domains" class="sidebar-link"><i class="ti ti-circle-check"></i><span>Trusted Domains</span></a></li>
   </ul>
   <div class="sidebar-divider"></div>
   <div class="sidebar-footer">
@@ -67,11 +68,14 @@
     <div class="page-header">
       <h1 class="page-title"><i class="ti ti-chart-bar" style="color:var(--color-brand);"></i>Analytics Dashboard</h1>
       <p class="page-sub">Overview of all phishing detection activity</p>
-      <button class="btn btn-outline btn-sm" id="refreshBtn"><i class="ti ti-refresh"></i>Refresh</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-outline btn-sm" id="refreshBtn"><i class="ti ti-refresh"></i>Refresh</button>
+        <a href="/api/v1/export/csv" class="btn btn-primary btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" id="exportCsvBtn"><i class="ti ti-download"></i>Export CSV</a>
+      </div>
     </div>
 
     <!-- STATS CARDS -->
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
       <div class="stat-card stat-card-total"><div class="stat-icon"><i class="ti ti-mail-opened"></i></div><div><div class="stat-num" id="dashTotal">—</div><div class="stat-lbl">Total Analysed</div></div></div>
       <div class="stat-card stat-card-phish"><div class="stat-icon"><i class="ti ti-bug"></i></div><div><div class="stat-num" id="dashPhishing">—</div><div class="stat-lbl">Phishing</div></div></div>
       <div class="stat-card stat-card-safe"><div class="stat-icon"><i class="ti ti-circle-check"></i></div><div><div class="stat-num" id="dashLegitimate">—</div><div class="stat-lbl">Legitimate</div></div></div>
