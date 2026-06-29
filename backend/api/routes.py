@@ -257,16 +257,17 @@ def stats():
             "trend":         [],
         })
 
-    # --- Count by classification (binary: legitimate | phishing) ---
+    # --- Count by classification (legitimate | suspicious | phishing) ---
     clf_counts = (
         db.session.query(AnalysisResult.classification, func.count(AnalysisResult.id))
         .group_by(AnalysisResult.classification)
         .all()
     )
-    counts = {"legitimate": 0, "phishing": 0}
+    counts = {"legitimate": 0, "suspicious": 0, "phishing": 0}
     for clf, cnt in clf_counts:
-        if clf in counts:
-            counts[clf] = cnt
+        clf_str = clf.name if hasattr(clf, 'name') else str(clf)
+        if clf_str in counts:
+            counts[clf_str] = cnt
 
     # --- Average risk score ---
     avg_score = db.session.query(func.avg(AnalysisResult.risk_score)).scalar() or 0.0
@@ -285,6 +286,18 @@ def stats():
         {"rule_id": r.rule_id, "name": r.name, "count": r.trigger_count}
         for r in top_rules_query
     ]
+
+    # --- Category breakdown of triggered rules ---
+    cat_counts_query = (
+        db.session.query(RuleModel.category, func.count(TriggeredRule.id).label("count"))
+        .join(TriggeredRule, TriggeredRule.rule_id == RuleModel.id)
+        .group_by(RuleModel.category)
+        .all()
+    )
+    category_breakdown = {}
+    for cat, cnt in cat_counts_query:
+        cat_str = cat.name if hasattr(cat, 'name') else str(cat)
+        category_breakdown[cat_str] = cnt
 
     # --- Daily trend for the last 14 days ---
     from datetime import datetime, timedelta, timezone
@@ -315,13 +328,15 @@ def stats():
         })
 
     return jsonify({
-        "success":        True,
-        "total":          total,
-        "legitimate":     counts.get("legitimate", 0),
-        "phishing":       counts.get("phishing", 0),
-        "avg_risk_score": round(float(avg_score), 2),
-        "top_rules":      top_rules,
-        "trend":          trend_data,
+        "success":            True,
+        "total":              total,
+        "legitimate":         counts.get("legitimate", 0),
+        "suspicious":         counts.get("suspicious", 0),
+        "phishing":           counts.get("phishing", 0),
+        "avg_risk_score":     round(float(avg_score), 2),
+        "top_rules":          top_rules,
+        "category_breakdown": category_breakdown,
+        "trend":              trend_data,
     })
 
 
@@ -482,6 +497,61 @@ def export_pdf(analysis_id: int):
     except Exception as exc:
         logger.error(f"[API] PDF generation failed for analysis {analysis_id}: {exc}")
         return error_response(f"PDF generation failed: {str(exc)}", 500)
+
+
+# ══════════════════════════════════════════════════════════
+#  GET /api/export/csv  — Export all history as CSV
+# ══════════════════════════════════════════════════════════
+@api_blueprint.route("/export/csv", methods=["GET"])
+def export_csv():
+    """
+    Generate and return a CSV file containing all historical analysis records.
+    """
+    import csv
+    import io
+    from flask import Response
+
+    try:
+        results = (
+            db.session.query(AnalysisResult, Email)
+            .join(Email, AnalysisResult.email_id == Email.id)
+            .order_by(AnalysisResult.analysed_at.desc())
+            .all()
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            "Analysis ID", "Email ID", "Sender", "Recipient", 
+            "Subject", "Risk Score", "Classification", 
+            "Confidence", "Analysed At", "Processing Time (s)"
+        ])
+
+        for analysis, email_row in results:
+            writer.writerow([
+                analysis.id,
+                email_row.id,
+                email_row.sender or "",
+                email_row.recipient or "",
+                email_row.subject or "",
+                analysis.risk_score,
+                analysis.classification,
+                analysis.confidence,
+                analysis.analysed_at.isoformat() if analysis.analysed_at else "",
+                analysis.processing_time or 0.0
+            ])
+
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=phishguard_history.csv"}
+        )
+    except Exception as exc:
+        logger.error(f"[API] CSV export failed: {exc}")
+        return error_response(f"CSV export failed: {str(exc)}", 500)
 
 
 # ══════════════════════════════════════════════════════════
@@ -668,4 +738,81 @@ def remediate_email():
         except Exception:
             pass
         return error_response(f"Remediation action failed: {str(exc)}", 500)
+
+
+# ══════════════════════════════════════════════════════════
+#  GET /api/v1/trusted-domains  — List trusted domains
+# ══════════════════════════════════════════════════════════
+@api_blueprint.route("/trusted-domains", methods=["GET"])
+def get_trusted_domains():
+    from backend.models.database import TrustedDomain
+    try:
+        domains = TrustedDomain.query.order_by(TrustedDomain.domain).all()
+        return jsonify({
+            "success": True,
+            "domains": [{"id": d.id, "domain": d.domain, "created_at": d.created_at.isoformat() if d.created_at else None} for d in domains]
+        })
+    except Exception as exc:
+        logger.error(f"[API] Failed to get trusted domains: {exc}")
+        return error_response(f"Failed to fetch trusted domains: {str(exc)}", 500)
+
+
+# ══════════════════════════════════════════════════════════
+#  POST /api/v1/trusted-domains  — Add trusted domain
+# ══════════════════════════════════════════════════════════
+@api_blueprint.route("/trusted-domains", methods=["POST"])
+def add_trusted_domain():
+    from backend.models.database import TrustedDomain
+    data = request.get_json(silent=True) or {}
+    domain = sanitise_input(data.get("domain", "")).strip().lower()
+
+    if not domain:
+        return error_response("Domain field is required.")
+
+    # Simple domain regex validation
+    import re
+    if not re.match(r"^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,10}$", domain):
+        return error_response("Invalid domain format.")
+
+    try:
+        existing = TrustedDomain.query.filter_by(domain=domain).first()
+        if existing:
+            return error_response(f"Domain '{domain}' is already trusted.")
+
+        new_domain = TrustedDomain(domain=domain)
+        db.session.add(new_domain)
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": f"Domain '{domain}' added to trusted list.",
+            "domain": {"id": new_domain.id, "domain": new_domain.domain}
+        }), 201
+    except Exception as exc:
+        db.session.rollback()
+        logger.error(f"[API] Failed to add trusted domain: {exc}")
+        return error_response(f"Failed to add trusted domain: {str(exc)}", 500)
+
+
+# ══════════════════════════════════════════════════════════
+#  DELETE /api/v1/trusted-domains/<id>  — Remove trusted domain
+# ══════════════════════════════════════════════════════════
+@api_blueprint.route("/trusted-domains/<int:domain_id>", methods=["DELETE"])
+def delete_trusted_domain(domain_id: int):
+    from backend.models.database import TrustedDomain
+    try:
+        domain = db.session.get(TrustedDomain, domain_id)
+        if not domain:
+            return error_response("Trusted domain not found.", 404)
+
+        db.session.delete(domain)
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": f"Domain '{domain.domain}' removed from trusted list."
+        })
+    except Exception as exc:
+        db.session.rollback()
+        logger.error(f"[API] Failed to delete trusted domain: {exc}")
+        return error_response(f"Failed to delete trusted domain: {str(exc)}", 500)
+
 
