@@ -462,9 +462,27 @@ class EmailParser:
         # This prevents the typosquatting check from firing on legitimate
         # sub-organisation addresses like hod@cse.udsm.ac.tz.
         d = parsed.sender_domain
-        if d in TRUSTED_DOMAINS or any(
-            d.endswith("." + t) for t in TRUSTED_DOMAINS
-        ):
+        is_trusted = False
+        if d:
+            try:
+                from flask import current_app
+                if current_app:
+                    from backend.models.database import TrustedDomain
+                    db_domains = [td.domain for td in TrustedDomain.query.all()]
+                    if db_domains:
+                        is_trusted = d in db_domains or any(
+                            d.endswith("." + t) for t in db_domains
+                        )
+                    else:
+                        raise ValueError("Empty trust table")
+                else:
+                    raise ValueError("No app context")
+            except Exception:
+                is_trusted = d in TRUSTED_DOMAINS or any(
+                    d.endswith("." + t) for t in TRUSTED_DOMAINS
+                )
+
+        if is_trusted:
             parsed.trusted_domain = True
 
     @staticmethod
@@ -528,8 +546,22 @@ class EmailParser:
         try:
             soup = BeautifulSoup(parsed.body_html, "html.parser")
 
-            # Visible text (decoded entities, no tags)
-            parsed.visible_text = soup.get_text(separator=" ", strip=True)
+            # Create a clone to strip hidden elements before extracting visible text
+            text_soup = BeautifulSoup(parsed.body_html, "html.parser")
+            hidden_re = re.compile(
+                r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0",
+                re.IGNORECASE,
+            )
+            # Remove hidden tags from text extraction tree
+            for tag in text_soup.find_all(True):
+                if hidden_re.search(tag.get("style", "")):
+                    tag.decompose()
+
+            # Visible text without hidden content
+            raw_visible = text_soup.get_text(separator=" ", strip=True)
+            # Remove zero-width spaces, soft hyphens, and other obfuscating non-printing characters
+            cleaned_visible = re.sub(r"[\u200b-\u200d\ufeff\u00ad]", "", raw_visible)
+            parsed.visible_text = cleaned_visible
             parsed.body_text_from_html = parsed.visible_text  # alias
 
             # Basic HTML indicators
