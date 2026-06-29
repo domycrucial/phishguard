@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PhishGuard – Trusted Domains</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="/static/css/main.css"/>
+</head>
+<body>
+
+<div class="topbar" id="topbar">
+  <div class="topbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>PhishGuard</span>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-lang">
+      <button class="topbar-lang-btn active" data-lang="en">EN</button>
+      <button class="topbar-lang-btn" data-lang="sw">SW</button>
+    </div>
+    <button class="topbar-theme" id="topbarTheme"><i class="ti ti-moon" id="topbarThemeIcon"></i></button>
+    <button class="hamburger" id="hamburger"><i class="ti ti-menu-2"></i></button>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="app-shell">
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M12 3L4 7v5c0 5.25 3.5 10 8 11 4.5-1 8-5.75 8-11V7L12 3z"/>
+      <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div><span class="brand-name">PhishGuard</span>&nbsp;<span class="brand-tag">v2.0</span></div>
+  </div>
+  <div class="sidebar-section-label">Navigation</div>
+  <ul class="sidebar-nav">
+    <li><a href="/" class="sidebar-link"><i class="ti ti-shield-search"></i><span>Analyse</span></a></li>
+    <li><a href="/dashboard" class="sidebar-link"><i class="ti ti-chart-bar"></i><span>Dashboard</span></a></li>
+    <li><a href="/training" class="sidebar-link"><i class="ti ti-school"></i><span>Training</span></a></li>
+    <li><a href="/rules" class="sidebar-link"><i class="ti ti-adjustments"></i><span>Rules</span></a></li>
+    <li><a href="/trusted-domains" class="sidebar-link active"><i class="ti ti-circle-check"></i><span>Trusted Domains</span></a></li>
+  </ul>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-footer">
+    <button class="sidebar-theme-btn" id="themeToggle">
+      <i class="ti ti-moon" id="themeIcon"></i><span id="themeLabel">Dark Mode</span>
+    </button>
+    <div class="sidebar-copy">PhishGuard &copy; 2026 &middot; Tanzania</div>
+  </div>
+</aside>
+
+<div class="page-content">
+  <main class="main-container" style="padding-top:28px;">
+
+    <div class="page-header">
+      <h1 class="page-title"><i class="ti ti-circle-check" style="color:var(--color-brand);"></i>Trusted Domains</h1>
+      <p class="page-sub">Add or remove sender domains that are always considered safe by the analysis pipeline.</p>
+    </div>
+
+    <!-- ADD DOMAIN CARD -->
+    <div class="card" style="margin-bottom: 24px;">
+      <div class="card-header"><h3 class="card-title">Add Trusted Domain</h3></div>
+      <form id="addDomainForm" style="display:flex; gap:12px; align-items:center; padding:16px;">
+        <input type="text" id="domainInput" class="form-input" placeholder="e.g. university.ac.tz" style="flex:1;" required />
+        <button type="submit" class="btn btn-primary"><i class="ti ti-plus"></i>Add Domain</button>
+      </form>
+    </div>
+
+    <!-- TRUSTED DOMAINS TABLE -->
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Active Whitelist</h3></div>
+      <div style="padding: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #E5E7EB);">
+        <input type="search" id="domainSearch" class="form-input" placeholder="Search whitelisted domains..." style="max-width: 300px;" />
+        <span id="domainCount" class="text-muted" style="font-size: 14px;">Loading domains...</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Domain Name</th>
+              <th>Added At</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="domainsTableBody">
+            <tr>
+              <td colspan="3" style="text-align:center; padding:40px; color:var(--text-muted);">Loading trusted domains list...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+</div>
+
+<!-- Common logic for theme switcher / responsive sidebar -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    // Theme toggle
+    const toggleTheme = () => {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      const next = current === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      
+      const themeIcon = document.getElementById("themeIcon");
+      const topbarThemeIcon = document.getElementById("topbarThemeIcon");
+      const themeLabel = document.getElementById("themeLabel");
+      
+      if (themeIcon) themeIcon.className = next === "dark" ? "ti ti-sun" : "ti ti-moon";
+      if (topbarThemeIcon) topbarThemeIcon.className = next === "dark" ? "ti ti-sun" : "ti ti-moon";
+      if (themeLabel) themeLabel.textContent = next === "dark" ? "Light Mode" : "Dark Mode";
+    };
+
+    document.getElementById("themeToggle")?.addEventListener("click", toggleTheme);
+    document.getElementById("topbarTheme")?.addEventListener("click", toggleTheme);
+    
+    // Sidebar responsive toggle
+    const hamburger = document.getElementById("hamburger");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebarOverlay");
+    
+    if (hamburger && sidebar && overlay) {
+      hamburger.addEventListener("click", () => {
+        sidebar.classList.toggle("open");
+        overlay.classList.toggle("active");
+      });
+      overlay.addEventListener("click", () => {
+        sidebar.classList.remove("open");
+        overlay.classList.remove("active");
+      });
+    }
+
+    // Set initial theme
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    const themeIcon = document.getElementById("themeIcon");
+    const topbarThemeIcon = document.getElementById("topbarThemeIcon");
+    if (themeIcon) themeIcon.className = savedTheme === "dark" ? "ti ti-sun" : "ti ti-moon";
+    if (topbarThemeIcon) topbarThemeIcon.className = savedTheme === "dark" ? "ti ti-sun" : "ti ti-moon";
+  });
+</script>
+<script src="/static/js/trusted_domains.js"></script>
+</body>
+</html>
