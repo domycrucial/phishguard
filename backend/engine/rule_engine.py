@@ -234,6 +234,16 @@ class RuleEngine:
             RuleEngine._rules_cache = [
                 _RuleProxy.from_orm(r) for r in orm_rules
             ]
+            # Pre-compile regexes for all active rules
+            for rule in RuleEngine._rules_cache:
+                pattern = rule.pattern or ""
+                if pattern and pattern not in RuleEngine._compiled_regex:
+                    try:
+                        RuleEngine._compiled_regex[pattern] = re.compile(
+                            pattern, re.IGNORECASE | re.DOTALL | re.UNICODE
+                        )
+                    except re.error:
+                        pass
             RuleEngine._cache_ts = now
             logger.debug(
                 f"[RuleEngine] Loaded {len(self._rules_cache)} rules from DB."
