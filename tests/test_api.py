@@ -317,3 +317,41 @@ class TestRemediationEndpoint:
             assert ind.indicator_type == "domain"
 
 
+class TestTrustedDomainsEndpoint:
+    def test_add_list_delete_trusted_domain(self, client):
+        # 1. List trusted domains
+        res = client.get("/api/v1/trusted-domains")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["success"] is True
+        assert isinstance(data["domains"], list)
+
+        # 2. Add a trusted domain
+        payload = {"domain": "test-domain-added.com"}
+        res = client.post("/api/v1/trusted-domains",
+                           data=json.dumps(payload),
+                           content_type="application/json")
+        assert res.status_code == 201
+        data = res.get_json()
+        assert data["success"] is True
+        assert data["domain"]["domain"] == "test-domain-added.com"
+        domain_id = data["domain"]["id"]
+
+        # 3. Add duplicate should fail
+        res = client.post("/api/v1/trusted-domains",
+                           data=json.dumps(payload),
+                           content_type="application/json")
+        assert res.status_code == 400
+
+        # 4. Delete the trusted domain
+        res = client.delete(f"/api/v1/trusted-domains/{domain_id}")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["success"] is True
+
+        # 5. Delete non-existent should return 404
+        res = client.delete(f"/api/v1/trusted-domains/{domain_id}")
+        assert res.status_code == 404
+
+
+
