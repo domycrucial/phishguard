@@ -94,6 +94,10 @@ def create_app(config_class=Config) -> Flask:
     def rules():
         return render_template("rules.html")
 
+    @app.route("/trusted-domains")
+    def trusted_domains():
+        return render_template("trusted_domains.html")
+
     # ── Health check endpoint ─────────────────────────────────────────────
     @app.route("/health")
     def health():
