@@ -44,11 +44,14 @@ class Email(db.Model):
 
 class AnalysisResult(db.Model):
     __tablename__ = "analysis_results"
+    __table_args__ = (
+        db.Index("idx_class_analysed_at", "classification", "analysed_at"),
+    )
     id               = Column(Integer, primary_key=True, autoincrement=True)
     email_id         = Column(Integer, ForeignKey("emails.id"), nullable=False, index=True)
     risk_score       = Column(Float,   nullable=False)
     classification   = Column(
-        Enum("legitimate", "suspicious", "phishing", name="classification_enum"),
+        Enum("legitimate", "phishing", name="classification_enum"),
         nullable=False
     )
     confidence       = Column(Float,   nullable=False, default=0.0)
@@ -155,6 +158,13 @@ class RemediationAction(db.Model):
     email       = db.relationship("Email")
 
 
+class TrustedDomain(db.Model):
+    __tablename__ = "trusted_domains"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    domain     = Column(String(253), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=_get_utc_now)
+
+
 def init_db():
 
     """
@@ -173,6 +183,69 @@ def init_db():
     except Exception as exc:
         import logging
         logging.getLogger(__name__).error(f"[DB] Rule sync failed: {exc}")
+
+    try:
+        _sync_trusted_domains()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error(f"[DB] Trusted domain sync failed: {exc}")
+
+    try:
+        _convert_suspicious_to_phishing()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error(f"[DB] Suspicious migration failed: {exc}")
+
+
+def _convert_suspicious_to_phishing():
+    """
+    Migrate any historical records with 'suspicious' classification to 'phishing'
+    as the system has migrated to a binary system.
+    """
+    try:
+        from backend.models.database import AnalysisResult
+        # Run raw SQL update to bypass Enum validation issues during transition
+        db.session.execute(
+            db.text("UPDATE analysis_results SET classification = 'phishing' WHERE classification = 'suspicious'")
+        )
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        raise exc
+
+
+def _sync_trusted_domains():
+    """
+    Seed initial trusted domains if the table is empty.
+    """
+    if TrustedDomain.query.first() is not None:
+        return
+
+    initial_domains = [
+        "google.com", "gmail.com", "googlemail.com",
+        "microsoft.com", "outlook.com", "live.com", "hotmail.com",
+        "apple.com", "icloud.com",
+        "amazon.com", "amazon.co.uk",
+        "paypal.com",
+        "crdbbank.com", "crdb.co.tz",
+        "nmbbank.co.tz",
+        "equitybank.co.tz",
+        "kcbgroup.com",
+        "tra.go.tz",
+        "udsm.ac.tz",
+        "udom.ac.tz",
+        "mzumbe.ac.tz",
+        "must.ac.tz",
+        "muhas.ac.tz",
+        "suza.ac.tz",
+        "open.ac.tz",
+        "tuma.ac.tz"
+    ]
+    for d in initial_domains:
+        existing = TrustedDomain.query.filter_by(domain=d).first()
+        if not existing:
+            db.session.add(TrustedDomain(domain=d))
+    db.session.commit()
 
 
 def _run_column_migrations():
